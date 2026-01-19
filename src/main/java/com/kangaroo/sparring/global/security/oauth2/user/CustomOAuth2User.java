@@ -1,5 +1,6 @@
 package com.kangaroo.sparring.global.security.oauth2.user;
 
+import com.kangaroo.sparring.global.security.UserIdPrincipal;
 import lombok.Getter;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.oauth2.core.user.OAuth2User;
@@ -8,7 +9,7 @@ import java.util.Collection;
 import java.util.Map;
 
 @Getter
-public class CustomOAuth2User implements OAuth2User {
+public class CustomOAuth2User implements OAuth2User, UserIdPrincipal {
 
     private final Long userId;
     private final String email;

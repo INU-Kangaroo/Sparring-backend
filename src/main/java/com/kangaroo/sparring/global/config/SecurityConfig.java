@@ -42,10 +42,17 @@ public class SecurityConfig {
                         .accessDeniedHandler(accessDeniedHandler)
                 )
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/auth/**").permitAll()
-                        .requestMatchers("/oauth2/**", "/login/oauth2/code/**").permitAll()
-                        .requestMatchers("/error").permitAll()
                         .requestMatchers(
+                                // Auth
+                                "/api/auth/**",
+                                // OAuth2
+                                "/oauth2/**",
+                                "/login/oauth2/code/**",
+                                // Survey (설문 문항 조회만 공개)
+                                "/api/surveys/*/questions",
+                                // Error
+                                "/error",
+                                // Swagger
                                 "/swagger-ui/**",
                                 "/swagger-ui.html",
                                 "/v3/api-docs/**",

@@ -25,6 +25,15 @@ public enum ErrorCode {
     EXPIRED_VERIFICATION_CODE(HttpStatus.BAD_REQUEST, "E003", "만료된 인증코드입니다"),
     TOO_MANY_REQUESTS(HttpStatus.TOO_MANY_REQUESTS, "E004", "잠시 후 다시 시도해주세요."),
 
+    // Survey
+    SURVEY_NOT_FOUND(HttpStatus.NOT_FOUND, "S001", "설문을 찾을 수 없습니다"),
+    QUESTION_NOT_FOUND(HttpStatus.NOT_FOUND, "S002", "질문을 찾을 수 없습니다"),
+    ANSWER_NOT_FOUND(HttpStatus.NOT_FOUND, "S003", "응답을 찾을 수 없습니다"),
+    SURVEY_ALREADY_COMPLETED(HttpStatus.CONFLICT, "S004", "이미 완료한 설문입니다"),
+    SURVEY_NOT_COMPLETED(HttpStatus.BAD_REQUEST, "S005", "아직 설문을 완료하지 않았습니다"),
+    HEALTH_PROFILE_NOT_FOUND(HttpStatus.NOT_FOUND, "S006", "건강 프로필을 찾을 수 없습니다"),
+    SURVEY_INCOMPLETE(HttpStatus.BAD_REQUEST, "S007", "모든 질문에 답변해야 합니다"),
+
     // Common
     INVALID_INPUT(HttpStatus.BAD_REQUEST, "C001", "잘못된 입력값입니다"),
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "C002", "서버 오류가 발생했습니다");

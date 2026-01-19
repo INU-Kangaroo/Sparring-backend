@@ -39,12 +39,9 @@ bin/
 
 # Docker Compose
 compose.yml
-docker-compose.yml
-docker-compose.*.yml
 
 # Environment Variables
 .env
-.env.*
 
 # Logs
 logs/
@@ -54,5 +51,3 @@ logs/
 # Temporary files
 *.tmp
 *.temp
-
-*.yml

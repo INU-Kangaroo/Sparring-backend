@@ -1,7 +1,7 @@
 package com.kangaroo.sparring.domain.survey.entity;
 
 import com.kangaroo.sparring.domain.common.BaseEntity;
-import com.kangaroo.sparring.domain.user.entity.Gender;
+import com.kangaroo.sparring.domain.user.type.Gender;
 import com.kangaroo.sparring.domain.user.entity.User;
 import com.kangaroo.sparring.domain.survey.type.*;
 import jakarta.persistence.*;

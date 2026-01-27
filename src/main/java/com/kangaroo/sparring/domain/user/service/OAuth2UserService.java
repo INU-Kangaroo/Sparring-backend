@@ -1,6 +1,6 @@
 package com.kangaroo.sparring.domain.user.service;
 
-import com.kangaroo.sparring.domain.user.entity.SocialProvider;
+import com.kangaroo.sparring.domain.user.type.SocialProvider;
 import com.kangaroo.sparring.domain.user.entity.User;
 import com.kangaroo.sparring.domain.user.repository.UserRepository;
 import com.kangaroo.sparring.global.security.oauth2.user.OAuth2UserInfo;

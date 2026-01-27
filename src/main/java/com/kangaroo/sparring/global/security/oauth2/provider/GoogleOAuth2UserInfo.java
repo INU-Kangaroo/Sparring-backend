@@ -1,6 +1,6 @@
 package com.kangaroo.sparring.global.security.oauth2.provider;
 
-import com.kangaroo.sparring.domain.user.entity.Gender;
+import com.kangaroo.sparring.domain.user.type.Gender;
 import com.kangaroo.sparring.global.security.oauth2.user.OAuth2UserInfo;
 
 import java.time.LocalDate;

@@ -1,6 +1,6 @@
 package com.kangaroo.sparring.domain.user.repository;
 
-import com.kangaroo.sparring.domain.user.entity.SocialProvider;
+import com.kangaroo.sparring.domain.user.type.SocialProvider;
 import com.kangaroo.sparring.domain.user.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;

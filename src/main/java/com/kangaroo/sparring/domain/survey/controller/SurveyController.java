@@ -27,7 +27,7 @@ public class SurveyController {
 
     private final SurveyService surveyService;
 
-    @Operation(summary = "설문 문항 조회", description = "설문 타입에 따른 문항 목록을 조회합니다.")
+    @Operation(summary = "설문 문항 조회", description = "설문 타입에 따른 문항 목록 조회")
     @GetMapping("/{surveyType}/questions")
     public ResponseEntity<SurveyQuestionsResponse> getSurveyQuestions(
             @PathVariable SurveyType surveyType
@@ -36,7 +36,7 @@ public class SurveyController {
         return ResponseEntity.ok(response);
     }
 
-    @Operation(summary = "설문 응답 제출", description = "설문 응답을 제출하고 다음 단계를 안내합니다.")
+    @Operation(summary = "설문 응답 제출", description = "설문 응답 제출")
     @PostMapping
     public ResponseEntity<SurveySubmitResponse> submitSurvey(
             @AuthenticationPrincipal UserIdPrincipal principal,
@@ -47,7 +47,7 @@ public class SurveyController {
         return ResponseEntity.ok(response);
     }
 
-    @Operation(summary = "설문 응답 조회", description = "사용자가 작성한 설문 응답을 조회합니다.")
+    @Operation(summary = "설문 응답 조회", description = "사용자가 작성한 설문 응답 조회")
     @GetMapping("/{surveyType}/answers")
     public ResponseEntity<SurveyAnswersResponse> getSurveyAnswers(
             @AuthenticationPrincipal UserIdPrincipal principal,
@@ -58,7 +58,7 @@ public class SurveyController {
         return ResponseEntity.ok(response);
     }
 
-    @Operation(summary = "설문 응답 수정", description = "특정 질문에 대한 응답을 수정하고 수정된 답변을 반환합니다.")
+    @Operation(summary = "설문 응답 수정", description = "특정 질문에 대한 응답 수정")
     @PatchMapping("/answers")
     public ResponseEntity<AnswerResponse> updateAnswer(
             @AuthenticationPrincipal UserIdPrincipal principal,
@@ -69,7 +69,7 @@ public class SurveyController {
         return ResponseEntity.ok(response);
     }
 
-    @Operation(summary = "설문 완료 여부 확인", description = "사용자가 해당 설문을 완료했는지 확인합니다.")
+    @Operation(summary = "설문 완료 여부 확인", description = "사용자가 해당 설문을 완료했는지 확인")
     @GetMapping("/{surveyType}/completed")
     public ResponseEntity<Boolean> checkSurveyCompleted(
             @AuthenticationPrincipal UserIdPrincipal principal,

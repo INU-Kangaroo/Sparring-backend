@@ -1,7 +1,7 @@
 package com.kangaroo.sparring.domain.measurement.dto.response;
 
 import com.kangaroo.sparring.domain.measurement.entity.BloodSugarLog;
-import com.kangaroo.sparring.domain.measurement.type.MeasurementType;
+import com.kangaroo.sparring.domain.measurement.type.BloodSugarMeasurementType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -25,7 +25,7 @@ public class BloodSugarLogResponse {
     private LocalDateTime measurementTime;
 
     @Schema(description = "측정 타입", example = "FASTING")
-    private MeasurementType measurementType;
+    private BloodSugarMeasurementType measurementType;
 
     @Schema(description = "측정 타입 설명", example = "공복")
     private String measurementTypeDescription;

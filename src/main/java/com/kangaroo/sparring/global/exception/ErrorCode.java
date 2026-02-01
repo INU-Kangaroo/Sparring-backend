@@ -40,6 +40,13 @@ public enum ErrorCode {
     INVALID_MEASUREMENT_TYPE(HttpStatus.BAD_REQUEST, "M003", "유효하지 않은 측정 타입입니다"),
     INVALID_DATE_RANGE(HttpStatus.BAD_REQUEST, "M004", "유효하지 않은 날짜 범위입니다"),
     AI_PREDICTION_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "M005", "AI 예측에 실패했습니다"),
+    INVALID_BLOOD_PRESSURE_RANGE(HttpStatus.BAD_REQUEST, "M006", "수축기 혈압은 이완기 혈압보다 높아야 합니다"),
+    INVALID_SYSTOLIC_PRESSURE(HttpStatus.BAD_REQUEST, "M007", "수축기 혈압은 50~300 mmHg 범위여야 합니다"),
+    INVALID_DIASTOLIC_PRESSURE(HttpStatus.BAD_REQUEST, "M008", "이완기 혈압은 30~200 mmHg 범위여야 합니다"),
+    INVALID_HEART_RATE(HttpStatus.BAD_REQUEST, "M009", "심박수는 30~250 bpm 범위여야 합니다"),
+    INVALID_GLUCOSE_LEVEL(HttpStatus.BAD_REQUEST, "M010", "혈당 수치는 20~600 mg/dL 범위여야 합니다"),
+    MEASUREMENT_TIME_FUTURE(HttpStatus.BAD_REQUEST, "M011", "측정 시간은 미래일 수 없습니다"),
+    INSUFFICIENT_DATA_FOR_PREDICTION(HttpStatus.BAD_REQUEST, "M012", "예측을 위한 충분한 데이터가 없습니다"),
 
     // Common
     INVALID_INPUT(HttpStatus.BAD_REQUEST, "C001", "잘못된 입력값입니다"),

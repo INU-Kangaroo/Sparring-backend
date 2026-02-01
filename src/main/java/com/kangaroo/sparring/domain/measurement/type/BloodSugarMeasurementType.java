@@ -8,8 +8,7 @@ import lombok.RequiredArgsConstructor;
  */
 @Getter
 @RequiredArgsConstructor
-public enum MeasurementType {
-
+public enum BloodSugarMeasurementType {
     FASTING("공복", "아침 식사 전 8시간 이상 금식 후 측정"),
     BEFORE_MEAL("식전", "식사 직전 측정"),
     AFTER_MEAL("식후", "식사 후 2시간 측정"),

@@ -21,6 +21,7 @@ import com.kangaroo.sparring.domain.user.repository.UserRepository;
 import com.kangaroo.sparring.global.exception.CustomException;
 import com.kangaroo.sparring.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,6 +32,7 @@ import java.util.ArrayList;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -46,6 +48,8 @@ public class SurveyService {
      * 설문 문항 조회
      */
     public SurveyQuestionsResponse getSurveyQuestions(SurveyType surveyType) {
+        validateHealthProfileFieldMappings(surveyType);
+
         Survey survey = surveyRepository.findBySurveyType(surveyType)
                 .orElseThrow(() -> new CustomException(ErrorCode.SURVEY_NOT_FOUND));
 
@@ -61,6 +65,8 @@ public class SurveyService {
         if (answerRepository.existsByUserIdAndSurveyType(userId, request.getSurveyType())) {
             throw new CustomException(ErrorCode.SURVEY_ALREADY_COMPLETED);
         }
+
+        validateHealthProfileFieldMappings(request.getSurveyType());
 
         // Survey 존재 여부 확인
         surveyRepository.findBySurveyType(request.getSurveyType())
@@ -132,6 +138,24 @@ public class SurveyService {
         updateHealthProfileFromSingleAnswer(userId, surveyType, answer);
 
         return AnswerResponse.from(answer);
+    }
+
+    private void validateHealthProfileFieldMappings(SurveyType surveyType) {
+        List<Question> questions = questionRepository.findBySurveyType(surveyType);
+        List<String> invalidFields = new ArrayList<>();
+        for (Question question : questions) {
+            String fieldName = question.getHealthProfileField();
+            if (fieldName == null || fieldName.isBlank()) {
+                continue;
+            }
+            if (!HealthProfile.isSupportedField(fieldName)) {
+                invalidFields.add(question.getQuestionKey() + ":" + fieldName);
+            }
+        }
+        if (!invalidFields.isEmpty()) {
+            log.error("Invalid healthProfileField mappings: {}", String.join(", ", invalidFields));
+            throw new CustomException(ErrorCode.INVALID_INPUT);
+        }
     }
 
     /**

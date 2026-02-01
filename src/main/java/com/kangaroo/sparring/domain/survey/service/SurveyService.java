@@ -7,9 +7,13 @@ import com.kangaroo.sparring.domain.survey.dto.res.SurveyAnswersResponse;
 import com.kangaroo.sparring.domain.survey.dto.res.SurveyQuestionsResponse;
 import com.kangaroo.sparring.domain.survey.dto.res.SurveySubmitResponse;
 
-import com.kangaroo.sparring.domain.survey.entity.*;
+import com.kangaroo.sparring.domain.healthprofile.entity.HealthProfile;
+import com.kangaroo.sparring.domain.healthprofile.repository.HealthProfileRepository;
+import com.kangaroo.sparring.domain.survey.entity.Answer;
+import com.kangaroo.sparring.domain.survey.entity.Question;
+import com.kangaroo.sparring.domain.survey.entity.Survey;
+import com.kangaroo.sparring.domain.survey.entity.SurveyType;
 import com.kangaroo.sparring.domain.survey.repository.AnswerRepository;
-import com.kangaroo.sparring.domain.survey.repository.HealthProfileRepository;
 import com.kangaroo.sparring.domain.survey.repository.QuestionRepository;
 import com.kangaroo.sparring.domain.survey.repository.SurveyRepository;
 import com.kangaroo.sparring.domain.user.entity.User;
@@ -23,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.ArrayList;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -180,21 +185,61 @@ public class SurveyService {
      * 기본 설문 답변으로 HealthProfile 업데이트
      */
     private void updateHealthProfileFromBasicSurvey(HealthProfile healthProfile, List<Answer> answers) {
-        // TODO: 질문의 healthProfileField 기반으로 매핑 로직 구현 예정
-        // 현재는 설문 데이터만 저장하고 HealthProfile은 나중에 매핑
+        applyHealthProfileUpdates(healthProfile, answers);
     }
 
     /**
      * 상세 설문 답변으로 HealthProfile 업데이트
      */
     private void updateHealthProfileFromDetailedSurvey(HealthProfile healthProfile, List<Answer> answers) {
-        // TODO: 질문의 healthProfileField 기반으로 매핑 로직 구현 예정
+        applyHealthProfileUpdates(healthProfile, answers);
     }
 
     /**
      * 단일 답변으로 HealthProfile 업데이트 (수정 시)
      */
     private void updateHealthProfileFromSingleAnswer(Long userId, SurveyType surveyType, Answer answer) {
-        // TODO: 답변 수정 시 HealthProfile 업데이트 로직 구현 예정
+        HealthProfile healthProfile = healthProfileRepository.findByUserId(userId)
+                .orElseThrow(() -> new CustomException(ErrorCode.HEALTH_PROFILE_NOT_FOUND));
+
+        String fieldName = answer.getQuestion().getHealthProfileField();
+        if (fieldName == null || fieldName.isBlank()) {
+            return;
+        }
+
+        if (!HealthProfile.isSupportedField(fieldName)) {
+            throw new CustomException(ErrorCode.INVALID_INPUT, "지원하지 않는 healthProfileField: " + fieldName);
+        }
+
+        boolean applied = healthProfile.applySurveyField(fieldName, answer.getAnswerText());
+        if (!applied) {
+            throw new CustomException(ErrorCode.INVALID_INPUT, "healthProfileField 값 형식 오류: " + fieldName);
+        }
+        healthProfileRepository.save(healthProfile);
+    }
+
+    private void applyHealthProfileUpdates(HealthProfile healthProfile, List<Answer> answers) {
+        List<String> invalidFields = new ArrayList<>();
+        for (Answer answer : answers) {
+            String fieldName = answer.getQuestion().getHealthProfileField();
+            if (fieldName == null || fieldName.isBlank()) {
+                continue;
+            }
+            if (!HealthProfile.isSupportedField(fieldName)) {
+                invalidFields.add(fieldName);
+                continue;
+            }
+            boolean applied = healthProfile.applySurveyField(fieldName, answer.getAnswerText());
+            if (!applied) {
+                invalidFields.add(fieldName);
+            }
+        }
+
+        if (!invalidFields.isEmpty()) {
+            throw new CustomException(
+                    ErrorCode.INVALID_INPUT,
+                    "healthProfileField 검증 실패: " + String.join(", ", invalidFields)
+            );
+        }
     }
 }

@@ -20,5 +20,6 @@ public class UpdateAnswerRequest {
     private String questionKey;
 
     @Schema(description = "답변 값 (문자열로 제출)", example = "175")
+    @NotBlank(message = "답변 값은 필수입니다.")
     private String answerText;
 }

@@ -11,7 +11,7 @@ import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
 
-import java.util.Random;
+import java.security.SecureRandom;
 import java.util.concurrent.TimeUnit;
 
 @Slf4j
@@ -32,6 +32,7 @@ public class EmailService {
     private static final int VERIFIED_EXPIRATION_MINUTES = 30;
     private static final String RESEND_COOLDOWN_PREFIX = "email:cooldown:";
     private static final int RESEND_COOLDOWN_SECONDS = 60; // 1분
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     /**
      * 이메일 인증코드 발송
@@ -56,7 +57,7 @@ public class EmailService {
         // 이메일 발송
         sendEmail(email, code);
 
-        log.info("이메일 인증코드 발송 완료: email={}, code={}", email, code);
+        log.info("이메일 인증코드 발송 완료: email={}", email);
     }
 
     /**
@@ -98,7 +99,7 @@ public class EmailService {
         // 이메일 발송
         sendEmail(email, code);
 
-        log.info("이메일 인증코드 재발송 완료: email={}, code={}", email, code);
+        log.info("이메일 인증코드 재발송 완료: email={}", email);
     }
 
     /**
@@ -148,8 +149,7 @@ public class EmailService {
      * 6자리 랜덤 코드 생성
      */
     private String generateRandomCode() {
-        Random random = new Random();
-        return String.format("%06d", random.nextInt(1000000));
+        return String.format("%06d", SECURE_RANDOM.nextInt(1000000));
     }
 
     /**

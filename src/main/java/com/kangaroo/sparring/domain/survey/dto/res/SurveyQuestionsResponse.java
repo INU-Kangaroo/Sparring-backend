@@ -29,6 +29,10 @@ public class SurveyQuestionsResponse {
                 .title(survey.getTitle())
                 .description(survey.getDescription())
                 .questions(survey.getQuestions().stream()
+                        .sorted((a, b) -> Integer.compare(
+                                a.getQuestionOrder() == null ? Integer.MAX_VALUE : a.getQuestionOrder(),
+                                b.getQuestionOrder() == null ? Integer.MAX_VALUE : b.getQuestionOrder()
+                        ))
                         .map(QuestionResponse::from)
                         .collect(Collectors.toList()))
                 .build();

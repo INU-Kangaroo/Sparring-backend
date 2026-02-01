@@ -4,6 +4,7 @@ import com.kangaroo.sparring.domain.measurement.entity.BloodSugarLog;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
@@ -29,31 +30,16 @@ public interface BloodSugarLogRepository extends JpaRepository<BloodSugarLog, Lo
             "ORDER BY b.measurementTime DESC")
     List<BloodSugarLog> findRecentByUserId(
             @Param("userId") Long userId,
-            @Param("limit") int limit
+            Pageable pageable
     );
 
     List<BloodSugarLog> findByUserIdAndIsDeletedFalseOrderByMeasurementTimeDesc(Long userId);
 
-    @Query("SELECT b FROM BloodSugarLog b " +
-            "WHERE b.user.id = :userId " +
-            "AND YEAR(b.measurementTime) = :year " +
-            "AND b.isDeleted = false " +
-            "ORDER BY b.measurementTime ASC")
-    List<BloodSugarLog> findByUserIdAndYear(
-            @Param("userId") Long userId,
-            @Param("year") int year
+    List<BloodSugarLog> findByUserIdAndMeasurementTimeBetweenAndIsDeletedFalseOrderByMeasurementTimeAsc(
+            Long userId,
+            LocalDateTime startDate,
+            LocalDateTime endDate
     );
 
-    // 특정 월 조회
-    @Query("SELECT b FROM BloodSugarLog b " +
-            "WHERE b.user.id = :userId " +
-            "AND YEAR(b.measurementTime) = :year " +
-            "AND MONTH(b.measurementTime) = :month " +
-            "AND b.isDeleted = false " +
-            "ORDER BY b.measurementTime ASC")
-    List<BloodSugarLog> findByUserIdAndYearAndMonth(
-            @Param("userId") Long userId,
-            @Param("year") int year,
-            @Param("month") int month
-    );
+    // 특정 기간 조회 (연/월 모두 공통 사용)
 }

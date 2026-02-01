@@ -30,6 +30,7 @@ public class Survey extends BaseEntity {
     private String description;
 
     @OneToMany(mappedBy = "survey", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("questionOrder ASC")
     @Builder.Default
     private List<Question> questions = new ArrayList<>();
 

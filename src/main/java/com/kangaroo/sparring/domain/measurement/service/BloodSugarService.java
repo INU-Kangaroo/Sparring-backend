@@ -21,6 +21,8 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -77,7 +79,13 @@ public class BloodSugarService {
             throw new CustomException(ErrorCode.INVALID_DATE_RANGE);
         }
 
-        List<BloodSugarLog> logs = bloodSugarLogRepository.findByUserIdAndYearAndMonth(userId, year, month);
+        YearMonth yearMonth = YearMonth.of(year, month);
+        LocalDateTime startDateTime = yearMonth.atDay(1).atStartOfDay();
+        LocalDateTime endDateTime = yearMonth.atEndOfMonth().atTime(LocalTime.MAX);
+
+        List<BloodSugarLog> logs = bloodSugarLogRepository
+                .findByUserIdAndMeasurementTimeBetweenAndIsDeletedFalseOrderByMeasurementTimeAsc(
+                        userId, startDateTime, endDateTime);
 
         return logs.stream()
                 .map(BloodSugarLogResponse::from)
@@ -104,7 +112,12 @@ public class BloodSugarService {
     public List<MonthlyBloodSugarResponse> getMonthlyStatistics(Long userId, int year) {
         log.info("월별 혈당 집계 조회: userId={}, year={}", userId, year);
 
-        List<BloodSugarLog> logs = bloodSugarLogRepository.findByUserIdAndYear(userId, year);
+        LocalDateTime startDateTime = LocalDate.of(year, 1, 1).atStartOfDay();
+        LocalDateTime endDateTime = LocalDate.of(year, 12, 31).atTime(LocalTime.MAX);
+
+        List<BloodSugarLog> logs = bloodSugarLogRepository
+                .findByUserIdAndMeasurementTimeBetweenAndIsDeletedFalseOrderByMeasurementTimeAsc(
+                        userId, startDateTime, endDateTime);
 
         if (logs.isEmpty()) {
             log.info("해당 연도 혈당 데이터 없음: userId={}, year={}", userId, year);

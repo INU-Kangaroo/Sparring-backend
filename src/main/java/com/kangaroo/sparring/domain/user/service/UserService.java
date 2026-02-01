@@ -1,5 +1,7 @@
 package com.kangaroo.sparring.domain.user.service;
 
+import com.kangaroo.sparring.domain.healthprofile.entity.HealthProfile;
+import com.kangaroo.sparring.domain.healthprofile.repository.HealthProfileRepository;
 import com.kangaroo.sparring.domain.user.dto.res.AuthResponse;
 import com.kangaroo.sparring.domain.user.dto.req.LoginRequest;
 import com.kangaroo.sparring.domain.user.dto.req.SignupRequest;
@@ -27,6 +29,7 @@ public class UserService {
     private final JwtUtil jwtUtil;
     private final RefreshTokenService refreshTokenService;
     private final EmailService emailService;
+    private final HealthProfileRepository healthProfileRepository;
 
     @Transactional
     public void signup(SignupRequest request) {
@@ -39,6 +42,7 @@ public class UserService {
 
         validateDuplicateEmail(request.getEmail());
         User user = userRepository.save(createUser(request));
+        createHealthProfileIfMissing(user);
 
         // 인증 플래그 삭제
         emailService.deleteVerifiedFlag(request.getEmail());
@@ -60,6 +64,16 @@ public class UserService {
                 .password(passwordEncoder.encode(request.getPassword()))
                 .username(request.getUsername())
                 .build();
+    }
+
+    private void createHealthProfileIfMissing(User user) {
+        if (healthProfileRepository.existsByUserId(user.getId())) {
+            return;
+        }
+        HealthProfile healthProfile = HealthProfile.builder()
+                .user(user)
+                .build();
+        healthProfileRepository.save(healthProfile);
     }
 
     private AuthResponse generateAuthResponse(User user) {

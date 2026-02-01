@@ -44,6 +44,9 @@ public class BloodSugarService {
 
         User user = findUserById(userId);
 
+        validateGlucoseLevel(request.getGlucoseLevel());
+        validateMeasurementTime(request.getMeasurementTime());
+
         BloodSugarLog bloodSugarLog = BloodSugarLog.create(
                 user,
                 request.getGlucoseLevel(),
@@ -63,6 +66,8 @@ public class BloodSugarService {
 
     public List<BloodSugarLogResponse> getBloodSugarLogs(Long userId, LocalDateTime startDate, LocalDateTime endDate) {
         log.info("혈당 측정 기록 조회: userId={}, startDate={}, endDate={}", userId, startDate, endDate);
+
+        validateDateRange(startDate, endDate);
 
         List<BloodSugarLog> logs = bloodSugarLogRepository.findByUserIdAndDateRange(userId, startDate, endDate);
 
@@ -97,6 +102,14 @@ public class BloodSugarService {
                                                                        LocalDate endDate) {
         log.info("혈당 예측 조회: userId={}, startDate={}, endDate={}", userId, startDate, endDate);
 
+        if (startDate == null || endDate == null) {
+            throw new CustomException(ErrorCode.INVALID_DATE_RANGE);
+        }
+
+        LocalDateTime startDateTime = startDate.atStartOfDay();
+        LocalDateTime endDateTime = endDate.atTime(LocalTime.MAX);
+        validateDateRange(startDateTime, endDateTime);
+
         List<BloodSugarPrediction> predictions =
                 bloodSugarPredictionRepository.findByUserIdAndDateRange(userId, startDate, endDate);
 
@@ -111,6 +124,10 @@ public class BloodSugarService {
 
     public List<MonthlyBloodSugarResponse> getMonthlyStatistics(Long userId, int year) {
         log.info("월별 혈당 집계 조회: userId={}, year={}", userId, year);
+
+        if (year < 1900 || year > 2100) {
+            throw new CustomException(ErrorCode.INVALID_DATE_RANGE);
+        }
 
         LocalDateTime startDateTime = LocalDate.of(year, 1, 1).atStartOfDay();
         LocalDateTime endDateTime = LocalDate.of(year, 12, 31).atTime(LocalTime.MAX);
@@ -172,6 +189,33 @@ public class BloodSugarService {
 
     private void requestPrediction(Long userId) {
         log.info("AI 예측 요청: userId={}", userId);
+    }
+
+    /**
+     * 혈당 수치 검증
+     */
+    private void validateGlucoseLevel(Integer glucoseLevel) {
+        if (glucoseLevel == null || glucoseLevel < 20 || glucoseLevel > 600) {
+            throw new CustomException(ErrorCode.INVALID_GLUCOSE_LEVEL);
+        }
+    }
+
+    /**
+     * 측정 시간 검증
+     */
+    private void validateMeasurementTime(LocalDateTime measurementTime) {
+        if (measurementTime.isAfter(LocalDateTime.now())) {
+            throw new CustomException(ErrorCode.MEASUREMENT_TIME_FUTURE);
+        }
+    }
+
+    /**
+     * 날짜 범위 검증
+     */
+    private void validateDateRange(LocalDateTime startDate, LocalDateTime endDate) {
+        if (startDate.isAfter(endDate)) {
+            throw new CustomException(ErrorCode.INVALID_DATE_RANGE);
+        }
     }
 
     private User findUserById(Long userId) {

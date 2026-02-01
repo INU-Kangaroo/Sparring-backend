@@ -1,6 +1,6 @@
 package com.kangaroo.sparring.domain.measurement.dto.request;
 
-import com.kangaroo.sparring.domain.measurement.type.MeasurementType;
+import com.kangaroo.sparring.domain.measurement.type.BloodSugarMeasurementType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
@@ -44,7 +44,7 @@ public class BloodSugarLogCreateRequest {
             requiredMode = Schema.RequiredMode.REQUIRED
     )
     @NotNull(message = "측정 타입은 필수입니다")
-    private MeasurementType measurementType;
+    private BloodSugarMeasurementType measurementType;
 
     @Schema(description = "메모", example = "아침 식사 전 측정")
     @Size(max = 500, message = "메모는 500자 이내로 입력해주세요")

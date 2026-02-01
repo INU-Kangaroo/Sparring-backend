@@ -68,7 +68,7 @@ public class BloodSugarController {
     }
 
     @Operation(summary = "혈당 측정 기록 조회 (월)", description = "특정 연도/월의 혈당 측정 기록을 조회한다")
-    @GetMapping("/logs/by-month")
+    @GetMapping("/logs/monthly")
     public ResponseEntity<List<BloodSugarLogResponse>> getBloodSugarLogsByMonth(
             @AuthenticationPrincipal CustomUserPrincipal principal,
             @Parameter(description = "연도", example = "2025")
@@ -85,7 +85,7 @@ public class BloodSugarController {
     }
 
     @Operation(summary = "월별 혈당 집계 조회", description = "특정 연도의 월별 혈당 통계를 조회한다 (1월~12월)")
-    @GetMapping("/logs/monthly")
+    @GetMapping("/logs/monthly-stats")
     public ResponseEntity<List<MonthlyBloodSugarResponse>> getMonthlyBloodSugar(
             @AuthenticationPrincipal CustomUserPrincipal principal,
             @Parameter(description = "연도", example = "2025")

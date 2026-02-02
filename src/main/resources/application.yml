@@ -125,3 +125,9 @@ springdoc:
   swagger-ui:
     path: /swagger-ui.html
     enabled: true
+
+# Gemini API Configuration
+gemini:
+  api:
+    key: ${GEMINI_API_KEY}
+    url: ${GEMINI_API_URL}

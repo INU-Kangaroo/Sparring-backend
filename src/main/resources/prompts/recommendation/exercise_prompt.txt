@@ -1,0 +1,35 @@
+사용자 건강 정보:
+{{USER_HEALTH_INFO}}
+
+운동 조건:
+- 시간: {{DURATION}}
+- 강도: {{INTENSITY}}
+- 장소: {{LOCATION}}
+
+위 사용자에게 적합한 운동을 추천해주세요.
+유산소 운동 3개와 근력 운동 3개를 추천하고,
+각 운동별로 지속 시간, 예상 칼로리(유산소), 빈도(근력), 주의사항을 알려주세요.
+주의사항 문장은 자연스러운 안내 문장으로 작성해주세요.
+문장은 "~임", "~것" 같은 단어형으로 끝내지 말고 완결된 문장으로 작성해주세요.
+유산소 운동의 칼로리는 minCalories와 maxCalories를 정수로 작성해주세요.
+각 운동의 precautions는 문자열 배열(1~3개)로 작성해주세요.
+
+반드시 아래 JSON 형식으로만 응답해주세요:
+{
+  "cardiacExercises": [
+    {
+      "name": "운동명",
+      "duration": "시간",
+      "minCalories": 300,
+      "maxCalories": 600,
+      "precautions": ["주의사항1", "주의사항2"]
+    }
+  ],
+  "strengthExercises": [
+    {"name": "운동명",
+    "duration": "시간",
+    "frequency": "빈도",
+    "precautions": ["주의사항1", "주의사항2"]
+    }
+  ]
+}

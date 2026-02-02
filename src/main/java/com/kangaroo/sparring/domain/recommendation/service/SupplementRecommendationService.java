@@ -1,0 +1,311 @@
+package com.kangaroo.sparring.domain.recommendation.service;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.kangaroo.sparring.domain.healthprofile.entity.HealthProfile;
+import com.kangaroo.sparring.domain.healthprofile.repository.HealthProfileRepository;
+import com.kangaroo.sparring.domain.measurement.entity.BloodPressureLog;
+import com.kangaroo.sparring.domain.measurement.entity.BloodSugarLog;
+import com.kangaroo.sparring.domain.measurement.repository.BloodPressureLogRepository;
+import com.kangaroo.sparring.domain.measurement.repository.BloodSugarLogRepository;
+import com.kangaroo.sparring.domain.recommendation.dto.response.SupplementDto;
+import com.kangaroo.sparring.domain.recommendation.dto.response.SupplementRecommendationResponse;
+import com.kangaroo.sparring.domain.recommendation.entity.SupplementRecommendation;
+import com.kangaroo.sparring.domain.recommendation.entity.Recommendation;
+import com.kangaroo.sparring.domain.recommendation.repository.SupplementRecommendationRepository;
+import com.kangaroo.sparring.domain.recommendation.repository.RecommendationRepository;
+import com.kangaroo.sparring.domain.recommendation.type.RecommendationType;
+import com.kangaroo.sparring.domain.user.entity.User;
+import com.kangaroo.sparring.domain.user.repository.UserRepository;
+import com.kangaroo.sparring.global.exception.CustomException;
+import com.kangaroo.sparring.global.exception.ErrorCode;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.stereotype.Service;
+
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class SupplementRecommendationService {
+
+    private static final int CACHE_HOURS = 168;
+    private static final int RECENT_MEASUREMENT_COUNT = 7;
+
+    private final RecommendationRepository recommendationRepository;
+    private final SupplementRecommendationRepository supplementRecommendationRepository;
+    private final UserRepository userRepository;
+    private final HealthProfileRepository healthProfileRepository;
+    private final BloodSugarLogRepository bloodSugarLogRepository;
+    private final BloodPressureLogRepository bloodPressureLogRepository;
+    private final GeminiApiClient geminiApiClient;
+    private final ObjectMapper objectMapper;
+    private final RecommendationPersistenceService recommendationPersistenceService;
+    private final RecommendationPromptTemplateService promptTemplateService;
+
+    public SupplementRecommendationResponse getSupplementRecommendations(Long userId) {
+        User user = findUserById(userId);
+        LocalDateTime cacheThreshold = LocalDateTime.now().minusHours(CACHE_HOURS);
+
+        return recommendationRepository
+                .findTopByUserAndTypeAndIsDeletedFalseAndCreatedAtAfterOrderByCreatedAtDesc(
+                        user,
+                        RecommendationType.SUPPLEMENT,
+                        cacheThreshold
+                )
+                .map(this::buildSupplementRecommendationResponse)
+                .orElseGet(() -> generateNewSupplementRecommendations(user));
+    }
+
+    public SupplementRecommendationResponse refreshSupplementRecommendations(Long userId) {
+        User user = findUserById(userId);
+        return generateNewSupplementRecommendations(user);
+    }
+
+    private SupplementRecommendationResponse generateNewSupplementRecommendations(User user) {
+        HealthProfile healthProfile = findHealthProfileByUserId(user.getId());
+        List<BloodSugarLog> recentBloodSugars = bloodSugarLogRepository.findRecentByUserId(
+                user.getId(),
+                PageRequest.of(0, RECENT_MEASUREMENT_COUNT)
+        );
+        List<BloodPressureLog> recentBloodPressures = bloodPressureLogRepository.findRecentByUserId(
+                user.getId(),
+                PageRequest.of(0, RECENT_MEASUREMENT_COUNT)
+        );
+
+        String prompt = buildSupplementPrompt(healthProfile, recentBloodSugars, recentBloodPressures);
+        String geminiResponse = geminiApiClient.generateContent(prompt);
+        SupplementRecommendationResponse response = parseSupplementResponse(geminiResponse);
+
+        Recommendation recommendation = Recommendation.createSupplementRecommendation(user);
+        recommendationPersistenceService.persistSupplementRecommendation(
+                recommendation,
+                buildSupplementEntities(recommendation, response)
+        );
+
+        log.info("새로운 영양제 추천 생성 완료: userId={}", user.getId());
+        return response;
+    }
+
+    private String buildSupplementPrompt(HealthProfile healthProfile,
+                                         List<BloodSugarLog> bloodSugars,
+                                         List<BloodPressureLog> bloodPressures) {
+        String userHealthInfo = RecommendationPromptSupport.buildUserHealthInfo(healthProfile, bloodSugars, bloodPressures);
+        return promptTemplateService.renderSupplementPrompt(Map.of(
+                "USER_HEALTH_INFO", userHealthInfo
+        ));
+    }
+
+    private SupplementRecommendationResponse parseSupplementResponse(String geminiResponse) {
+        try {
+            JsonNode root = objectMapper.readTree(extractJsonObject(geminiResponse));
+            List<SupplementDto> supplements = new ArrayList<>();
+            JsonNode supplementsNode = resolveSupplementsNode(root);
+
+            if (supplementsNode.isArray()) {
+                for (JsonNode node : supplementsNode) {
+                    supplements.add(SupplementDto.of(
+                            node.path("name").asText(),
+                            node.path("dosage").asText(),
+                            node.path("frequency").asText(),
+                            readBenefits(node),
+                            readPrecautions(node)
+                    ));
+                }
+            }
+
+            return SupplementRecommendationResponse.of(supplements);
+        } catch (Exception e) {
+            log.error("Gemini 응답 파싱 실패: body={}", abbreviate(geminiResponse), e);
+            throw new CustomException(ErrorCode.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    private List<SupplementRecommendation> buildSupplementEntities(Recommendation recommendation, SupplementRecommendationResponse response) {
+        List<SupplementRecommendation> supplements = new ArrayList<>();
+
+        for (SupplementDto dto : response.getSupplements()) {
+            supplements.add(SupplementRecommendation.of(
+                    recommendation,
+                    dto.getName(),
+                    dto.getDosage(),
+                    dto.getFrequency(),
+                    writeAsJson(dto.getBenefits()),
+                    writeAsJson(dto.getPrecautions())
+            ));
+        }
+
+        return supplements;
+    }
+
+    private SupplementRecommendationResponse buildSupplementRecommendationResponse(Recommendation recommendation) {
+        List<SupplementRecommendation> supplements = supplementRecommendationRepository.findByRecommendationOrderByIdAsc(recommendation);
+
+        List<SupplementDto> supplementDtos = supplements.stream()
+                .map(n -> SupplementDto.of(
+                        n.getName(),
+                        n.getDosage(),
+                        n.getFrequency(),
+                        readBenefitsText(n.getBenefits()),
+                        readJsonArray(n.getPrecautions())
+                ))
+                .toList();
+
+        return SupplementRecommendationResponse.of(supplementDtos);
+    }
+
+    private User findUserById(Long userId) {
+        return userRepository.findById(userId)
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+    }
+
+    private HealthProfile findHealthProfileByUserId(Long userId) {
+        return healthProfileRepository.findByUserId(userId)
+                .orElseThrow(() -> new CustomException(ErrorCode.HEALTH_PROFILE_NOT_FOUND));
+    }
+
+    private String stripMarkdownFence(String value) {
+        return value.replace("```json", "")
+                .replace("```", "")
+                .trim();
+    }
+
+    private String extractJsonObject(String value) {
+        String cleaned = stripMarkdownFence(value);
+        int start = cleaned.indexOf('{');
+        int end = cleaned.lastIndexOf('}');
+        if (start >= 0 && end > start) {
+            return cleaned.substring(start, end + 1);
+        }
+        return cleaned;
+    }
+
+    private List<String> readStringArray(JsonNode node) {
+        List<String> values = new ArrayList<>();
+        if (node.isArray()) {
+            for (JsonNode value : node) {
+                String text = value.asText("");
+                if (!text.isBlank()) {
+                    values.add(text.trim());
+                }
+            }
+        }
+        return values;
+    }
+
+    private JsonNode resolveSupplementsNode(JsonNode root) {
+        if (root == null || root.isMissingNode() || root.isNull()) {
+            return objectMapper.createArrayNode();
+        }
+        if (root.isArray()) {
+            return root;
+        }
+        JsonNode supplementsNode = root.path("supplements");
+        if (supplementsNode.isArray()) {
+            return supplementsNode;
+        }
+        JsonNode nutrientsNode = root.path("nutrients");
+        if (nutrientsNode.isArray()) {
+            return nutrientsNode;
+        }
+        return objectMapper.createArrayNode();
+    }
+
+    private List<String> readPrecautions(JsonNode node) {
+        List<String> precautions = readStringArray(node.path("precautions"));
+        if (!precautions.isEmpty()) {
+            return precautions;
+        }
+        String single = node.path("precaution").asText("");
+        if (!single.isBlank()) {
+            return List.of(single);
+        }
+        return List.of();
+    }
+
+    private String writeAsJson(List<String> values) {
+        try {
+            return objectMapper.writeValueAsString(values == null ? List.of() : values);
+        } catch (JsonProcessingException e) {
+            throw new CustomException(ErrorCode.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    private List<String> readJsonArray(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return List.of();
+        }
+        try {
+            JsonNode node = objectMapper.readTree(raw);
+            return readStringArray(node);
+        } catch (Exception e) {
+            log.warn("영양제 문자열 배열 역직렬화 실패: value={}", raw);
+            return List.of();
+        }
+    }
+
+    private List<String> readBenefits(JsonNode node) {
+        List<String> benefits = readStringListFlexible(node.path("benefits"));
+        if (!benefits.isEmpty()) {
+            return benefits;
+        }
+        benefits = readStringListFlexible(node.path("benefit"));
+        if (!benefits.isEmpty()) {
+            return benefits;
+        }
+        return List.of();
+    }
+
+    private List<String> readBenefitsText(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return List.of();
+        }
+        String trimmed = raw.trim();
+        if (!trimmed.startsWith("[")) {
+            return List.of(trimmed);
+        }
+        try {
+            JsonNode node = objectMapper.readTree(trimmed);
+            return readStringArray(node);
+        } catch (Exception e) {
+            log.warn("효능 문자열 역직렬화 실패: value={}", raw);
+            return List.of(trimmed);
+        }
+    }
+
+    private List<String> readStringListFlexible(JsonNode node) {
+        List<String> values = readStringArray(node);
+        if (!values.isEmpty()) {
+            return values;
+        }
+        if (node != null && node.isTextual()) {
+            String text = node.asText("").trim();
+            if (text.isEmpty()) {
+                return List.of();
+            }
+            String[] lines = text.split("\\R");
+            List<String> lineValues = new ArrayList<>();
+            for (String line : lines) {
+                String trimmed = line.trim().replaceFirst("^[\\-•\\d.\\)\\s]+", "");
+                if (!trimmed.isBlank()) {
+                    lineValues.add(trimmed);
+                }
+            }
+            return lineValues.isEmpty() ? List.of(text) : lineValues;
+        }
+        return List.of();
+    }
+
+    private String abbreviate(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value.length() <= 500 ? value : value.substring(0, 500) + "...";
+    }
+}

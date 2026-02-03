@@ -104,7 +104,7 @@ public class SupplementRecommendationService {
 
     private SupplementRecommendationResponse parseSupplementResponse(String geminiResponse) {
         try {
-            JsonNode root = objectMapper.readTree(extractJsonObject(geminiResponse));
+            JsonNode root = objectMapper.readTree(RecommendationJsonSupport.extractJsonObject(geminiResponse));
             List<SupplementDto> supplements = new ArrayList<>();
             JsonNode supplementsNode = resolveSupplementsNode(root);
 
@@ -122,7 +122,7 @@ public class SupplementRecommendationService {
 
             return SupplementRecommendationResponse.of(supplements);
         } catch (Exception e) {
-            log.error("Gemini 응답 파싱 실패: body={}", abbreviate(geminiResponse), e);
+            log.error("Gemini 응답 파싱 실패: body={}", RecommendationJsonSupport.abbreviate(geminiResponse), e);
             throw new CustomException(ErrorCode.INTERNAL_SERVER_ERROR);
         }
     }
@@ -167,36 +167,13 @@ public class SupplementRecommendationService {
 
     private HealthProfile findHealthProfileByUserId(Long userId) {
         return healthProfileRepository.findByUserId(userId)
-                .orElseThrow(() -> new CustomException(ErrorCode.HEALTH_PROFILE_NOT_FOUND));
-    }
-
-    private String stripMarkdownFence(String value) {
-        return value.replace("```json", "")
-                .replace("```", "")
-                .trim();
-    }
-
-    private String extractJsonObject(String value) {
-        String cleaned = stripMarkdownFence(value);
-        int start = cleaned.indexOf('{');
-        int end = cleaned.lastIndexOf('}');
-        if (start >= 0 && end > start) {
-            return cleaned.substring(start, end + 1);
-        }
-        return cleaned;
-    }
-
-    private List<String> readStringArray(JsonNode node) {
-        List<String> values = new ArrayList<>();
-        if (node.isArray()) {
-            for (JsonNode value : node) {
-                String text = value.asText("");
-                if (!text.isBlank()) {
-                    values.add(text.trim());
-                }
-            }
-        }
-        return values;
+                .orElseGet(() -> {
+                    User user = findUserById(userId);
+                    HealthProfile healthProfile = HealthProfile.builder()
+                            .user(user)
+                            .build();
+                    return healthProfileRepository.save(healthProfile);
+                });
     }
 
     private JsonNode resolveSupplementsNode(JsonNode root) {
@@ -218,7 +195,7 @@ public class SupplementRecommendationService {
     }
 
     private List<String> readPrecautions(JsonNode node) {
-        List<String> precautions = readStringArray(node.path("precautions"));
+        List<String> precautions = RecommendationArraySupport.readStringArray(node.path("precautions"));
         if (!precautions.isEmpty()) {
             return precautions;
         }
@@ -243,7 +220,7 @@ public class SupplementRecommendationService {
         }
         try {
             JsonNode node = objectMapper.readTree(raw);
-            return readStringArray(node);
+            return RecommendationArraySupport.readStringArray(node);
         } catch (Exception e) {
             log.warn("영양제 문자열 배열 역직렬화 실패: value={}", raw);
             return List.of();
@@ -272,7 +249,7 @@ public class SupplementRecommendationService {
         }
         try {
             JsonNode node = objectMapper.readTree(trimmed);
-            return readStringArray(node);
+            return RecommendationArraySupport.readStringArray(node);
         } catch (Exception e) {
             log.warn("효능 문자열 역직렬화 실패: value={}", raw);
             return List.of(trimmed);
@@ -280,7 +257,7 @@ public class SupplementRecommendationService {
     }
 
     private List<String> readStringListFlexible(JsonNode node) {
-        List<String> values = readStringArray(node);
+        List<String> values = RecommendationArraySupport.readStringArray(node);
         if (!values.isEmpty()) {
             return values;
         }
@@ -302,10 +279,4 @@ public class SupplementRecommendationService {
         return List.of();
     }
 
-    private String abbreviate(String value) {
-        if (value == null) {
-            return "";
-        }
-        return value.length() <= 500 ? value : value.substring(0, 500) + "...";
-    }
 }

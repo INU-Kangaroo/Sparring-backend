@@ -123,7 +123,7 @@ public class ExerciseRecommendationService {
 
     private ExerciseRecommendationResponse parseExerciseResponse(String geminiResponse) {
         try {
-            String sanitizedJson = sanitizeRangeNumberFields(extractJsonObject(geminiResponse));
+            String sanitizedJson = sanitizeRangeNumberFields(RecommendationJsonSupport.extractJsonObject(geminiResponse));
             JsonNode root = objectMapper.readTree(sanitizedJson);
 
             List<CardiacExerciseDto> cardiacExercises = new ArrayList<>();
@@ -156,7 +156,7 @@ public class ExerciseRecommendationService {
 
             return ExerciseRecommendationResponse.of(cardiacExercises, strengthExercises);
         } catch (Exception e) {
-            log.error("Gemini 응답 파싱 실패: body={}", abbreviate(geminiResponse), e);
+            log.error("Gemini 응답 파싱 실패: body={}", RecommendationJsonSupport.abbreviate(geminiResponse), e);
             throw new CustomException(ErrorCode.INTERNAL_SERVER_ERROR);
         }
     }
@@ -227,23 +227,13 @@ public class ExerciseRecommendationService {
 
     private HealthProfile findHealthProfileByUserId(Long userId) {
         return healthProfileRepository.findByUserId(userId)
-                .orElseThrow(() -> new CustomException(ErrorCode.HEALTH_PROFILE_NOT_FOUND));
-    }
-
-    private String stripMarkdownFence(String value) {
-        return value.replace("```json", "")
-                .replace("```", "")
-                .trim();
-    }
-
-    private String extractJsonObject(String value) {
-        String cleaned = stripMarkdownFence(value);
-        int start = cleaned.indexOf('{');
-        int end = cleaned.lastIndexOf('}');
-        if (start >= 0 && end > start) {
-            return cleaned.substring(start, end + 1);
-        }
-        return cleaned;
+                .orElseGet(() -> {
+                    User user = findUserById(userId);
+                    HealthProfile healthProfile = HealthProfile.builder()
+                            .user(user)
+                            .build();
+                    return healthProfileRepository.save(healthProfile);
+                });
     }
 
     private String sanitizeRangeNumberFields(String json) {
@@ -305,25 +295,8 @@ public class ExerciseRecommendationService {
         return numbers;
     }
 
-    private String abbreviate(String value) {
-        if (value == null) {
-            return "";
-        }
-        return value.length() <= 500 ? value : value.substring(0, 500) + "...";
-    }
-
-    private List<String> readStringArray(JsonNode node) {
-        List<String> values = new ArrayList<>();
-        if (node.isArray()) {
-            for (JsonNode value : node) {
-                values.add(value.asText());
-            }
-        }
-        return values;
-    }
-
     private List<String> readPrecautions(JsonNode node) {
-        List<String> precautions = readStringArray(node.path("precautions"));
+        List<String> precautions = RecommendationArraySupport.readStringArray(node.path("precautions"));
         if (!precautions.isEmpty()) {
             return precautions;
         }
@@ -352,7 +325,7 @@ public class ExerciseRecommendationService {
         }
         try {
             JsonNode node = objectMapper.readTree(trimmed);
-            return readStringArray(node);
+            return RecommendationArraySupport.readStringArray(node);
         } catch (Exception e) {
             log.warn("운동 주의사항 역직렬화 실패: value={}", raw);
             return List.of();

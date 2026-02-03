@@ -47,4 +47,30 @@ public interface BloodPressureLogRepository extends JpaRepository<BloodPressureL
             @Param("userId") Long userId,
             Pageable pageable
     );
+
+    @Query("SELECT function('month', bpl.measuredAt) AS month, " +
+            "AVG(bpl.systolic) AS avgSystolic, MAX(bpl.systolic) AS maxSystolic, MIN(bpl.systolic) AS minSystolic, " +
+            "AVG(bpl.diastolic) AS avgDiastolic, MAX(bpl.diastolic) AS maxDiastolic, MIN(bpl.diastolic) AS minDiastolic, " +
+            "COUNT(bpl.id) AS count " +
+            "FROM BloodPressureLog bpl " +
+            "WHERE bpl.user.id = :userId " +
+            "AND bpl.measuredAt BETWEEN :startDate AND :endDate " +
+            "AND bpl.isDeleted = false " +
+            "GROUP BY function('month', bpl.measuredAt)")
+    List<MonthlyBloodPressureStats> findMonthlyStatsByUserId(
+            @Param("userId") Long userId,
+            @Param("startDate") LocalDateTime startDate,
+            @Param("endDate") LocalDateTime endDate
+    );
+
+    interface MonthlyBloodPressureStats {
+        Integer getMonth();
+        Double getAvgSystolic();
+        Integer getMaxSystolic();
+        Integer getMinSystolic();
+        Double getAvgDiastolic();
+        Integer getMaxDiastolic();
+        Integer getMinDiastolic();
+        Long getCount();
+    }
 }

@@ -138,23 +138,23 @@ public class BloodPressureService {
         LocalDateTime startDateTime = LocalDate.of(year, 1, 1).atStartOfDay();
         LocalDateTime endDateTime = LocalDate.of(year, 12, 31).atTime(LocalTime.MAX);
 
-        List<BloodPressureLog> logs = bloodPressureLogRepository
-                .findByUserIdAndMeasuredAtBetweenAndIsDeletedFalseOrderByMeasuredAtAsc(
-                        userId, startDateTime, endDateTime);
+        List<BloodPressureLogRepository.MonthlyBloodPressureStats> stats = bloodPressureLogRepository
+                .findMonthlyStatsByUserId(userId, startDateTime, endDateTime);
 
-        if (logs.isEmpty()) {
+        if (stats.isEmpty()) {
             log.info("해당 연도 혈압 데이터 없음: userId={}, year={}", userId, year);
             return new ArrayList<>();
         }
 
-        Map<Integer, List<BloodPressureLog>> logsByMonth = logs.stream()
-                .collect(Collectors.groupingBy(log -> log.getMeasuredAt().getMonthValue()));
+        Map<Integer, BloodPressureLogRepository.MonthlyBloodPressureStats> statsByMonth = stats.stream()
+                .filter(item -> item.getMonth() != null)
+                .collect(Collectors.toMap(BloodPressureLogRepository.MonthlyBloodPressureStats::getMonth, item -> item));
 
         List<MonthlyBloodPressureResponse> responses = new ArrayList<>();
         for (int month = 1; month <= 12; month++) {
-            List<BloodPressureLog> monthLogs = logsByMonth.get(month);
+            BloodPressureLogRepository.MonthlyBloodPressureStats monthStats = statsByMonth.get(month);
 
-            if (monthLogs == null || monthLogs.isEmpty()) {
+            if (monthStats == null || monthStats.getCount() == null || monthStats.getCount() == 0L) {
                 responses.add(MonthlyBloodPressureResponse.of(
                         year,
                         month,
@@ -162,48 +162,31 @@ public class BloodPressureService {
                         MonthlyBloodPressureResponse.Stat.of(null, null, null),
                         0L
                 ));
-            } else {
-                double averageSystolic = monthLogs.stream()
-                        .mapToInt(BloodPressureLog::getSystolic)
-                        .average()
-                        .orElse(0.0);
-                double averageDiastolic = monthLogs.stream()
-                        .mapToInt(BloodPressureLog::getDiastolic)
-                        .average()
-                        .orElse(0.0);
-                int maxSystolic = monthLogs.stream()
-                        .mapToInt(BloodPressureLog::getSystolic)
-                        .max()
-                        .orElse(0);
-                int minSystolic = monthLogs.stream()
-                        .mapToInt(BloodPressureLog::getSystolic)
-                        .min()
-                        .orElse(0);
-                int maxDiastolic = monthLogs.stream()
-                        .mapToInt(BloodPressureLog::getDiastolic)
-                        .max()
-                        .orElse(0);
-                int minDiastolic = monthLogs.stream()
-                        .mapToInt(BloodPressureLog::getDiastolic)
-                        .min()
-                        .orElse(0);
-
-                responses.add(MonthlyBloodPressureResponse.of(
-                        year,
-                        month,
-                        MonthlyBloodPressureResponse.Stat.of(
-                                BigDecimal.valueOf(averageSystolic).setScale(1, RoundingMode.HALF_UP),
-                                maxSystolic,
-                                minSystolic
-                        ),
-                        MonthlyBloodPressureResponse.Stat.of(
-                                BigDecimal.valueOf(averageDiastolic).setScale(1, RoundingMode.HALF_UP),
-                                maxDiastolic,
-                                minDiastolic
-                        ),
-                        (long) monthLogs.size()
-                ));
+                continue;
             }
+
+            BigDecimal avgSystolic = monthStats.getAvgSystolic() == null
+                    ? null
+                    : BigDecimal.valueOf(monthStats.getAvgSystolic()).setScale(1, RoundingMode.HALF_UP);
+            BigDecimal avgDiastolic = monthStats.getAvgDiastolic() == null
+                    ? null
+                    : BigDecimal.valueOf(monthStats.getAvgDiastolic()).setScale(1, RoundingMode.HALF_UP);
+
+            responses.add(MonthlyBloodPressureResponse.of(
+                    year,
+                    month,
+                    MonthlyBloodPressureResponse.Stat.of(
+                            avgSystolic,
+                            monthStats.getMaxSystolic(),
+                            monthStats.getMinSystolic()
+                    ),
+                    MonthlyBloodPressureResponse.Stat.of(
+                            avgDiastolic,
+                            monthStats.getMaxDiastolic(),
+                            monthStats.getMinDiastolic()
+                    ),
+                    monthStats.getCount()
+            ));
         }
 
         return responses;

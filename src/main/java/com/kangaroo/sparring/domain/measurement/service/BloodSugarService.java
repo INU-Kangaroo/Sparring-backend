@@ -132,23 +132,23 @@ public class BloodSugarService {
         LocalDateTime startDateTime = LocalDate.of(year, 1, 1).atStartOfDay();
         LocalDateTime endDateTime = LocalDate.of(year, 12, 31).atTime(LocalTime.MAX);
 
-        List<BloodSugarLog> logs = bloodSugarLogRepository
-                .findByUserIdAndMeasurementTimeBetweenAndIsDeletedFalseOrderByMeasurementTimeAsc(
-                        userId, startDateTime, endDateTime);
+        List<BloodSugarLogRepository.MonthlyBloodSugarStats> stats = bloodSugarLogRepository
+                .findMonthlyStatsByUserId(userId, startDateTime, endDateTime);
 
-        if (logs.isEmpty()) {
+        if (stats.isEmpty()) {
             log.info("해당 연도 혈당 데이터 없음: userId={}, year={}", userId, year);
             return new ArrayList<>();
         }
 
-        Map<Integer, List<BloodSugarLog>> logsByMonth = logs.stream()
-                .collect(Collectors.groupingBy(log -> log.getMeasurementTime().getMonthValue()));
+        Map<Integer, BloodSugarLogRepository.MonthlyBloodSugarStats> statsByMonth = stats.stream()
+                .filter(item -> item.getMonth() != null)
+                .collect(Collectors.toMap(BloodSugarLogRepository.MonthlyBloodSugarStats::getMonth, item -> item));
 
         List<MonthlyBloodSugarResponse> responses = new ArrayList<>();
         for (int month = 1; month <= 12; month++) {
-            List<BloodSugarLog> monthLogs = logsByMonth.get(month);
+            BloodSugarLogRepository.MonthlyBloodSugarStats monthStats = statsByMonth.get(month);
 
-            if (monthLogs == null || monthLogs.isEmpty()) {
+            if (monthStats == null || monthStats.getCount() == null || monthStats.getCount() == 0L) {
                 responses.add(MonthlyBloodSugarResponse.builder()
                         .year(year)
                         .month(month)
@@ -157,31 +157,21 @@ public class BloodSugarService {
                         .minValue(null)
                         .count(0L)
                         .build());
-            } else {
-                double average = monthLogs.stream()
-                        .mapToInt(BloodSugarLog::getGlucoseLevel)
-                        .average()
-                        .orElse(0.0);
-
-                int max = monthLogs.stream()
-                        .mapToInt(BloodSugarLog::getGlucoseLevel)
-                        .max()
-                        .orElse(0);
-
-                int min = monthLogs.stream()
-                        .mapToInt(BloodSugarLog::getGlucoseLevel)
-                        .min()
-                        .orElse(0);
-
-                responses.add(MonthlyBloodSugarResponse.of(
-                        year,
-                        month,
-                        BigDecimal.valueOf(average).setScale(1, RoundingMode.HALF_UP),
-                        max,
-                        min,
-                        (long) monthLogs.size()
-                ));
+                continue;
             }
+
+            BigDecimal avg = monthStats.getAvgValue() == null
+                    ? null
+                    : BigDecimal.valueOf(monthStats.getAvgValue()).setScale(1, RoundingMode.HALF_UP);
+
+            responses.add(MonthlyBloodSugarResponse.of(
+                    year,
+                    month,
+                    avg,
+                    monthStats.getMaxValue(),
+                    monthStats.getMinValue(),
+                    monthStats.getCount()
+            ));
         }
 
         return responses;

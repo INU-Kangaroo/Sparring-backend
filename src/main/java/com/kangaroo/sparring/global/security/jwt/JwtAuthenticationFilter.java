@@ -45,6 +45,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     ) throws ServletException, IOException {
         String token = resolveToken(request);
         if (token != null && jwtUtil.validateToken(token)) {
+            String tokenType = jwtUtil.getTokenType(token);
+            if (!"access".equals(tokenType)) {
+                authenticationEntryPoint.commence(
+                        request,
+                        response,
+                        new InsufficientAuthenticationException("액세스 토큰이 아닙니다.")
+                );
+                return;
+            }
             Long userId = jwtUtil.getUserIdFromToken(token);
             User user = userRepository.findById(userId).orElse(null);
 

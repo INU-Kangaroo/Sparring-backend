@@ -1,6 +1,7 @@
 package com.kangaroo.sparring.domain.survey.dto.req;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.kangaroo.sparring.domain.survey.entity.SurveyType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -13,6 +14,13 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @Schema(description = "설문 응답 수정 요청")
 public class UpdateAnswerRequest {
+
+    @Schema(
+            description = "설문 타입",
+            example = "DETAILED"
+    )
+    @NotNull(message = "설문 타입은 필수입니다.")
+    private SurveyType surveyType;
 
     @Schema(
             description = "질문 키 (규칙: {SURVEY_TYPE}_{FIELD})",

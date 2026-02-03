@@ -103,6 +103,7 @@ public class SurveyController {
                                     name = "Single Choice",
                                     value = """
                                             {
+                                              "surveyType": "DETAILED",
                                               "questionKey": "DETAILED_MEAL_FREQUENCY",
                                               "value": "ONE_TO_TWO"
                                             }
@@ -112,6 +113,7 @@ public class SurveyController {
                                     name = "Multiple Choice",
                                     value = """
                                             {
+                                              "surveyType": "DETAILED",
                                               "questionKey": "DETAILED_EXERCISE_PLACE",
                                               "value": ["GYM_FACILITY", "OUTDOOR"]
                                             }

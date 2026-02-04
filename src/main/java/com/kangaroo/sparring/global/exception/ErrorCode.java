@@ -13,6 +13,8 @@ public enum ErrorCode {
     DUPLICATE_EMAIL(HttpStatus.CONFLICT, "U002", "이미 사용중인 이메일입니다"),
     INVALID_PASSWORD(HttpStatus.UNAUTHORIZED, "U003", "비밀번호가 일치하지 않습니다"),
     INACTIVE_USER(HttpStatus.FORBIDDEN, "U004", "비활성화된 사용자입니다"),
+    PASSWORD_CHANGE_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "U005", "소셜 로그인 계정은 비밀번호 변경이 불가능합니다"),
+    INVALID_PASSWORD_CONFIRM(HttpStatus.BAD_REQUEST, "U006", "새 비밀번호 확인이 일치하지 않습니다"),
 
     // JWT & Auth
     INVALID_TOKEN(HttpStatus.UNAUTHORIZED, "A001", "유효하지 않은 토큰입니다"),
@@ -23,7 +25,8 @@ public enum ErrorCode {
     EMAIL_NOT_VERIFIED(HttpStatus.FORBIDDEN, "E001", "이메일 인증이 필요합니다"),
     INVALID_VERIFICATION_CODE(HttpStatus.BAD_REQUEST, "E002", "유효하지 않은 인증코드입니다"),
     EXPIRED_VERIFICATION_CODE(HttpStatus.BAD_REQUEST, "E003", "만료된 인증코드입니다"),
-    TOO_MANY_REQUESTS(HttpStatus.TOO_MANY_REQUESTS, "E004", "잠시 후 다시 시도해주세요."),
+    VERIFICATION_NOT_FOUND(HttpStatus.BAD_REQUEST, "E004", "인증 요청이 존재하지 않습니다"),
+    TOO_MANY_REQUESTS(HttpStatus.TOO_MANY_REQUESTS, "E005", "잠시 후 다시 시도해주세요."),
 
     // Survey
     SURVEY_NOT_FOUND(HttpStatus.NOT_FOUND, "S001", "설문을 찾을 수 없습니다"),

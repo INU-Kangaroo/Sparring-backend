@@ -21,7 +21,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
-@Tag(name = "Survey", description = "설문조사 API")
+@Tag(name = "설문", description = "설문조사 API")
 @RestController
 @RequestMapping("/api/surveys")
 @RequiredArgsConstructor

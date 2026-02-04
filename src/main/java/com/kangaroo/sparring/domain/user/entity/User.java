@@ -64,6 +64,30 @@ public class User extends BaseEntity {
         this.profileImageUrl = profileImageUrl;
     }
 
+    public void updateUsername(String username) {
+        if (username != null && !username.isBlank()) {
+            this.username = username;
+        }
+    }
+
+    public void updateEmail(String email) {
+        if (email != null && !email.isBlank()) {
+            this.email = email;
+        }
+    }
+
+    public void updateBirthDate(LocalDate birthDate) {
+        if (birthDate != null) {
+            this.birthDate = birthDate;
+        }
+    }
+
+    public void updatePassword(String encodedPassword) {
+        if (encodedPassword != null && !encodedPassword.isBlank()) {
+            this.password = encodedPassword;
+        }
+    }
+
     public void updateProvider(SocialProvider provider, String providerId) {
         this.provider = provider;
         this.providerId = providerId;
@@ -76,6 +100,10 @@ public class User extends BaseEntity {
 
     // 소셜 로그인 사용자 여부
     public boolean isSocialUser() {
-        return this.provider != null;
+        return this.provider == SocialProvider.GOOGLE || this.provider == SocialProvider.KAKAO;
+    }
+
+    public boolean isLocalUser() {
+        return this.provider == null || this.provider == SocialProvider.LOCAL;
     }
 }

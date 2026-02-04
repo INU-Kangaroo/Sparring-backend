@@ -1,5 +1,6 @@
 package com.kangaroo.sparring.global.email;
 
+import com.kangaroo.sparring.domain.user.entity.User;
 import com.kangaroo.sparring.domain.user.repository.UserRepository;
 import com.kangaroo.sparring.global.exception.CustomException;
 import com.kangaroo.sparring.global.exception.ErrorCode;
@@ -11,7 +12,10 @@ import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
 
-import java.security.SecureRandom;
+import java.time.LocalDateTime;
+import java.util.Optional;
+import java.util.Random;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 @Slf4j
@@ -26,69 +30,30 @@ public class EmailService {
     @Value("${spring.mail.username}")
     private String fromEmail;
 
-    private static final String CODE_PREFIX = "email:code:";
+    private static final String VERIFICATION_PREFIX = "email:verification:";
+    private static final String LATEST_PREFIX = "email:verification:latest:";
     private static final String VERIFIED_PREFIX = "email:verified:";
     private static final int CODE_EXPIRATION_MINUTES = 5;
     private static final int VERIFIED_EXPIRATION_MINUTES = 30;
     private static final String RESEND_COOLDOWN_PREFIX = "email:cooldown:";
     private static final int RESEND_COOLDOWN_SECONDS = 60; // 1분
-    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     /**
      * 이메일 인증코드 발송
      */
-    public void sendVerificationCode(String email) {
-        // 중복 이메일 체크
-        if (userRepository.existsByEmail(email)) {
-            throw new CustomException(ErrorCode.DUPLICATE_EMAIL);
-        }
-
-        // 6자리 랜덤 코드 생성
-        String code = generateRandomCode();
-
-        // Redis에 저장 (5분)
-        redisTemplate.opsForValue().set(
-                CODE_PREFIX + email,
-                code,
-                CODE_EXPIRATION_MINUTES,
-                TimeUnit.MINUTES
-        );
-
-        // 이메일 발송
-        sendEmail(email, code);
-
-        log.info("이메일 인증코드 발송 완료: email={}", email);
-    }
-
-    /**
-     * 이메일 인증코드 재발송
-     */
-    public void resendVerificationCode(String email) {
-        // 쿨다운 체크
+    public EmailVerificationResult sendVerificationCode(String email, Long userId) {
         String cooldownKey = RESEND_COOLDOWN_PREFIX + email;
         String cooldown = redisTemplate.opsForValue().get(cooldownKey);
-
         if (cooldown != null) {
             throw new CustomException(ErrorCode.TOO_MANY_REQUESTS);
         }
 
-        // 중복 이메일 체크
-        if (userRepository.existsByEmail(email)) {
-            throw new CustomException(ErrorCode.DUPLICATE_EMAIL);
-        }
+        validateEmailForVerification(email, userId);
 
-        // 새 인증코드 생성
         String code = generateRandomCode();
+        String verificationId = generateVerificationId();
+        saveVerification(verificationId, email, code, userId);
 
-        // Redis에 저장 (5분)
-        redisTemplate.opsForValue().set(
-                CODE_PREFIX + email,
-                code,
-                CODE_EXPIRATION_MINUTES,
-                TimeUnit.MINUTES
-        );
-
-        // 쿨다운 설정 (1분)
         redisTemplate.opsForValue().set(
                 cooldownKey,
                 "true",
@@ -96,42 +61,82 @@ public class EmailService {
                 TimeUnit.SECONDS
         );
 
-        // 이메일 발송
         sendEmail(email, code);
 
-        log.info("이메일 인증코드 재발송 완료: email={}", email);
+        LocalDateTime expiresAt = LocalDateTime.now().plusMinutes(CODE_EXPIRATION_MINUTES);
+        log.info("email verification sent: email={}, verificationId={}", email, verificationId);
+        return EmailVerificationResult.forSend(verificationId, email, expiresAt);
+    }
+
+    /**
+     * 이메일 인증코드 재발송
+     */
+    public EmailVerificationResult resendVerificationCode(String email, Long userId) {
+        String cooldownKey = RESEND_COOLDOWN_PREFIX + email;
+        String cooldown = redisTemplate.opsForValue().get(cooldownKey);
+        if (cooldown != null) {
+            throw new CustomException(ErrorCode.TOO_MANY_REQUESTS);
+        }
+
+        validateEmailForVerification(email, userId);
+
+        String code = generateRandomCode();
+        String verificationId = generateVerificationId();
+        saveVerification(verificationId, email, code, userId);
+
+        redisTemplate.opsForValue().set(
+                cooldownKey,
+                "true",
+                RESEND_COOLDOWN_SECONDS,
+                TimeUnit.SECONDS
+        );
+
+        sendEmail(email, code);
+
+        LocalDateTime expiresAt = LocalDateTime.now().plusMinutes(CODE_EXPIRATION_MINUTES);
+        log.info("email verification resent: email={}, verificationId={}", email, verificationId);
+        return EmailVerificationResult.forSend(verificationId, email, expiresAt);
     }
 
     /**
      * 인증코드 검증
      */
-    public void verifyCode(String email, String code) {
-        String savedCode = redisTemplate.opsForValue().get(CODE_PREFIX + email);
-
+    public EmailVerificationResult verifyCode(String verificationId, String code) {
+        String savedCode = redisTemplate.opsForValue().get(codeKey(verificationId));
         if (savedCode == null) {
-            throw new CustomException(ErrorCode.EXPIRED_VERIFICATION_CODE);
+            throw new CustomException(ErrorCode.VERIFICATION_NOT_FOUND);
         }
 
         if (!savedCode.equals(code)) {
             throw new CustomException(ErrorCode.INVALID_VERIFICATION_CODE);
         }
 
-        // 인증 완료 플래그 생성 (30분)
-        redisTemplate.opsForValue().set(
-                VERIFIED_PREFIX + email,
-                "true",
-                VERIFIED_EXPIRATION_MINUTES,
-                TimeUnit.MINUTES
-        );
+        String email = redisTemplate.opsForValue().get(emailKey(verificationId));
+        if (email == null) {
+            deleteVerification(verificationId, null);
+            throw new CustomException(ErrorCode.VERIFICATION_NOT_FOUND);
+        }
 
-        // 사용한 코드 삭제
-        redisTemplate.delete(CODE_PREFIX + email);
+        String userIdValue = redisTemplate.opsForValue().get(userKey(verificationId));
+        Long userId = userIdValue != null ? Long.valueOf(userIdValue) : null;
 
-        log.info("이메일 인증 완료: email={}", email);
+        if (userId == null) {
+            redisTemplate.opsForValue().set(
+                    VERIFIED_PREFIX + email,
+                    "true",
+                    VERIFIED_EXPIRATION_MINUTES,
+                    TimeUnit.MINUTES
+            );
+        }
+
+        deleteVerification(verificationId, email);
+
+        log.info("email verification success: email={}, verificationId={}", email, verificationId);
+        return EmailVerificationResult.forVerify(email, userId);
     }
 
     /**
-     * 이메일 인증 여부 확인
+     * 이메일 인증 여부 확인 (회원가입용)
      */
     public boolean isEmailVerified(String email) {
         String verified = redisTemplate.opsForValue().get(VERIFIED_PREFIX + email);
@@ -145,11 +150,88 @@ public class EmailService {
         redisTemplate.delete(VERIFIED_PREFIX + email);
     }
 
+    private void validateEmailForVerification(String email, Long userId) {
+        Optional<User> existingUser = userRepository.findByEmail(email);
+        if (existingUser.isEmpty()) {
+            return;
+        }
+        if (userId != null && existingUser.get().getId().equals(userId)) {
+            return;
+        }
+        throw new CustomException(ErrorCode.DUPLICATE_EMAIL);
+    }
+
+    private void saveVerification(String verificationId, String email, String code, Long userId) {
+        String latestKey = latestKey(email);
+        String previousId = redisTemplate.opsForValue().get(latestKey);
+        if (previousId != null) {
+            deleteVerification(previousId, email);
+        }
+
+        redisTemplate.opsForValue().set(
+                codeKey(verificationId),
+                code,
+                CODE_EXPIRATION_MINUTES,
+                TimeUnit.MINUTES
+        );
+        redisTemplate.opsForValue().set(
+                emailKey(verificationId),
+                email,
+                CODE_EXPIRATION_MINUTES,
+                TimeUnit.MINUTES
+        );
+        if (userId != null) {
+            redisTemplate.opsForValue().set(
+                    userKey(verificationId),
+                    String.valueOf(userId),
+                    CODE_EXPIRATION_MINUTES,
+                    TimeUnit.MINUTES
+            );
+        }
+
+        redisTemplate.opsForValue().set(
+                latestKey,
+                verificationId,
+                CODE_EXPIRATION_MINUTES,
+                TimeUnit.MINUTES
+        );
+    }
+
+    private void deleteVerification(String verificationId, String email) {
+        redisTemplate.delete(codeKey(verificationId));
+        redisTemplate.delete(emailKey(verificationId));
+        redisTemplate.delete(userKey(verificationId));
+        if (email != null) {
+            redisTemplate.delete(latestKey(email));
+        }
+    }
+
+    private String codeKey(String verificationId) {
+        return VERIFICATION_PREFIX + verificationId + ":code";
+    }
+
+    private String emailKey(String verificationId) {
+        return VERIFICATION_PREFIX + verificationId + ":email";
+    }
+
+    private String userKey(String verificationId) {
+        return VERIFICATION_PREFIX + verificationId + ":user";
+    }
+
+    private String latestKey(String email) {
+        return LATEST_PREFIX + email;
+    }
+
+    private String generateVerificationId() {
+        return UUID.randomUUID().toString().replace("-", "");
+    }
+
     /**
      * 6자리 랜덤 코드 생성
      */
     private String generateRandomCode() {
-        return String.format("%06d", SECURE_RANDOM.nextInt(1000000));
+        Random random = new Random();
+        return String.format("%06d", random.nextInt(1000000));
     }
 
     /**

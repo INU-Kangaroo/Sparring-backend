@@ -32,7 +32,7 @@ public class BloodPressureController {
 
     private final BloodPressureService bloodPressureService;
 
-    @Operation(summary = "혈압 측정 기록 등록", description = "혈압 측정 기록을 등록하고 AI 예측을 자동 생성한다")
+    @Operation(summary = "혈압 측정 기록 등록", description = "혈압 기록 등록 및 AI 예측 자동 생성")
     @PostMapping("/logs")
     public ResponseEntity<BloodPressureLogResponse> createBloodPressureLog(
             @AuthenticationPrincipal UserIdPrincipal principal,
@@ -45,7 +45,7 @@ public class BloodPressureController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
-    @Operation(summary = "혈압 측정 기록 조회 (기간)", description = "특정 기간의 혈압 측정 기록을 조회한다")
+    @Operation(summary = "혈압 측정 기록 조회 (기간)", description = "특정 기간 혈압 기록 조회")
     @GetMapping("/logs")
     public ResponseEntity<List<BloodPressureLogResponse>> getBloodPressureLogs(
             @AuthenticationPrincipal UserIdPrincipal principal,
@@ -67,7 +67,7 @@ public class BloodPressureController {
         return ResponseEntity.ok(responses);
     }
 
-    @Operation(summary = "혈압 측정 기록 조회 (월)", description = "특정 연도/월의 혈압 측정 기록을 조회한다")
+    @Operation(summary = "혈압 측정 기록 조회 (월)", description = "특정 연도/월 혈압 기록 조회")
     @GetMapping("/logs/monthly")
     public ResponseEntity<List<BloodPressureLogResponse>> getBloodPressureLogsByMonth(
             @AuthenticationPrincipal UserIdPrincipal principal,
@@ -84,7 +84,7 @@ public class BloodPressureController {
         return ResponseEntity.ok(responses);
     }
 
-    @Operation(summary = "혈압 예측 조회", description = "특정 기간의 혈압 예측 데이터를 조회한다")
+    @Operation(summary = "혈압 예측 조회", description = "특정 기간 혈압 예측 데이터 조회")
     @GetMapping("/predictions")
     public ResponseEntity<List<BloodPressurePredictionResponse>> getBloodPressurePredictions(
             @AuthenticationPrincipal UserIdPrincipal principal,
@@ -101,7 +101,7 @@ public class BloodPressureController {
         return ResponseEntity.ok(responses);
     }
 
-    @Operation(summary = "월별 혈압 집계 조회", description = "특정 연도의 월별 혈압 통계를 조회한다 (1월~12월)")
+    @Operation(summary = "월별 혈압 집계 조회", description = "특정 연도 월별 혈압 통계 조회 (1월~12월)")
     @GetMapping("/logs/monthly-stats")
     public ResponseEntity<List<MonthlyBloodPressureResponse>> getMonthlyBloodPressure(
             @AuthenticationPrincipal UserIdPrincipal principal,

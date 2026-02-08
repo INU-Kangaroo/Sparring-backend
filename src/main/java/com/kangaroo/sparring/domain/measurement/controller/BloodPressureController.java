@@ -5,6 +5,8 @@ import com.kangaroo.sparring.domain.measurement.dto.response.BloodPressureLogRes
 import com.kangaroo.sparring.domain.measurement.dto.response.BloodPressurePredictionResponse;
 import com.kangaroo.sparring.domain.measurement.dto.response.MonthlyBloodPressureResponse;
 import com.kangaroo.sparring.domain.measurement.service.BloodPressureService;
+import com.kangaroo.sparring.global.exception.CustomException;
+import com.kangaroo.sparring.global.exception.ErrorCode;
 import com.kangaroo.sparring.global.security.principal.UserIdPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -38,7 +40,7 @@ public class BloodPressureController {
             @AuthenticationPrincipal UserIdPrincipal principal,
             @Valid @RequestBody BloodPressureLogCreateRequest request
     ) {
-        Long userId = principal.getUserId();
+        Long userId = resolveUserId(principal);
         log.info("혈압 측정 기록 등록 API 호출: userId={}", userId);
 
         BloodPressureLogResponse response = bloodPressureService.createBloodPressureLog(userId, request);
@@ -54,7 +56,7 @@ public class BloodPressureController {
             @Parameter(description = "종료 날짜 (yyyy-MM-dd)", example = "2026-01-31")
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate
     ) {
-        Long userId = principal.getUserId();
+        Long userId = resolveUserId(principal);
 
         LocalDateTime startDateTime = startDate.atStartOfDay();
         LocalDateTime endDateTime = endDate.atTime(LocalTime.MAX);
@@ -76,7 +78,7 @@ public class BloodPressureController {
             @Parameter(description = "월 (1-12)", example = "10")
             @RequestParam int month
     ) {
-        Long userId = principal.getUserId();
+        Long userId = resolveUserId(principal);
         log.info("월별 혈압 측정 기록 조회 API 호출: userId={}, year={}, month={}", userId, year, month);
 
         List<BloodPressureLogResponse> responses =
@@ -93,7 +95,7 @@ public class BloodPressureController {
             @Parameter(description = "종료 날짜 (yyyy-MM-dd)", example = "2026-01-31")
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate
     ) {
-        Long userId = principal.getUserId();
+        Long userId = resolveUserId(principal);
         log.info("혈압 예측 조회 API 호출: userId={}, startDate={}, endDate={}", userId, startDate, endDate);
 
         List<BloodPressurePredictionResponse> responses =
@@ -108,11 +110,18 @@ public class BloodPressureController {
             @Parameter(description = "연도", example = "2025")
             @RequestParam int year
     ) {
-        Long userId = principal.getUserId();
+        Long userId = resolveUserId(principal);
         log.info("월별 혈압 집계 조회 API 호출: userId={}, year={}", userId, year);
 
         List<MonthlyBloodPressureResponse> responses =
                 bloodPressureService.getMonthlyStatistics(userId, year);
         return ResponseEntity.ok(responses);
+    }
+
+    private Long resolveUserId(UserIdPrincipal principal) {
+        if (principal == null) {
+            throw new CustomException(ErrorCode.UNAUTHORIZED);
+        }
+        return principal.getUserId();
     }
 }

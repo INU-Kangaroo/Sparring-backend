@@ -54,7 +54,7 @@ public class HealthProfileService {
         return HealthProfileResponse.from(updatedProfile);
     }
 
-    private HealthProfile getOrCreateHealthProfile(Long userId) {
+    public HealthProfile getOrCreateHealthProfile(Long userId) {
         return healthProfileRepository.findByUserId(userId)
                 .orElseGet(() -> {
                     User user = userRepository.findById(userId)

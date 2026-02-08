@@ -3,19 +3,14 @@ package com.kangaroo.sparring.domain.healthprofile.entity;
 import com.kangaroo.sparring.domain.common.BaseEntity;
 import com.kangaroo.sparring.domain.user.type.Gender;
 import com.kangaroo.sparring.domain.user.entity.User;
+import com.kangaroo.sparring.domain.healthprofile.support.HealthProfileFieldSupport;
 import com.kangaroo.sparring.domain.survey.type.*;
 import jakarta.persistence.*;
 import lombok.*;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.io.IOException;
 import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeParseException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Locale;
 
 @Entity
 @Table(name = "health_profile")
@@ -24,9 +19,6 @@ import java.util.Locale;
 @AllArgsConstructor
 @Builder
 public class HealthProfile extends BaseEntity {
-
-    private static final com.fasterxml.jackson.databind.ObjectMapper OBJECT_MAPPER =
-            new com.fasterxml.jackson.databind.ObjectMapper();
 
     @Id
     @Column(name = "user_id")
@@ -206,34 +198,34 @@ public class HealthProfile extends BaseEntity {
             return true;
         }
 
-        String key = normalizeFieldName(fieldName);
+        String key = HealthProfileFieldSupport.normalizeFieldName(fieldName);
         boolean applied = true;
         switch (key) {
-            case "birthDate" -> applied = setDate(rawValue, value -> this.birthDate = value);
-            case "gender" -> applied = setEnum(Gender.class, rawValue, value -> this.gender = value);
-            case "height" -> applied = setDecimal(rawValue, value -> this.height = value);
-            case "weight" -> applied = setDecimal(rawValue, value -> this.weight = value);
-            case "bmi" -> applied = setDecimal(rawValue, value -> this.bmi = value);
-            case "bloodSugarStatus" -> applied = setEnum(BloodSugarStatus.class, rawValue, value -> this.bloodSugarStatus = value);
-            case "bloodPressureStatus" -> applied = setEnum(BloodPressureStatus.class, rawValue, value -> this.bloodPressureStatus = value);
-            case "hasFamilyHypertension" -> applied = setBoolean(rawValue, value -> this.hasFamilyHypertension = value);
+            case "birthDate" -> applied = HealthProfileFieldSupport.setDate(rawValue, value -> this.birthDate = value);
+            case "gender" -> applied = HealthProfileFieldSupport.setEnum(Gender.class, rawValue, value -> this.gender = value);
+            case "height" -> applied = HealthProfileFieldSupport.setDecimal(rawValue, value -> this.height = value);
+            case "weight" -> applied = HealthProfileFieldSupport.setDecimal(rawValue, value -> this.weight = value);
+            case "bmi" -> applied = HealthProfileFieldSupport.setDecimal(rawValue, value -> this.bmi = value);
+            case "bloodSugarStatus" -> applied = HealthProfileFieldSupport.setEnum(BloodSugarStatus.class, rawValue, value -> this.bloodSugarStatus = value);
+            case "bloodPressureStatus" -> applied = HealthProfileFieldSupport.setEnum(BloodPressureStatus.class, rawValue, value -> this.bloodPressureStatus = value);
+            case "hasFamilyHypertension" -> applied = HealthProfileFieldSupport.setBoolean(rawValue, value -> this.hasFamilyHypertension = value);
             case "medications" -> this.medications = rawValue;
             case "allergies" -> this.allergies = rawValue;
             case "healthGoal" -> this.healthGoal = rawValue;
-            case "mealFrequency" -> applied = setEnum(MealFrequency.class, rawValue, value -> this.mealFrequency = value);
-            case "foodPreference" -> applied = setJsonCodeArray(FoodPreference.class, rawValue, value -> this.foodPreference = value);
-            case "sugarIntakeFreq" -> applied = setEnum(SugarIntakeFreq.class, rawValue, value -> this.sugarIntakeFreq = value);
-            case "caffeineIntake" -> applied = setBoolean(rawValue, value -> this.caffeineIntake = value);
-            case "exerciseFrequency" -> applied = setEnum(ExerciseFrequency.class, rawValue, value -> this.exerciseFrequency = value);
-            case "exercisePlace" -> applied = setJsonCodeArray(ExercisePlace.class, rawValue, value -> this.exercisePlace = value);
+            case "mealFrequency" -> applied = HealthProfileFieldSupport.setEnum(MealFrequency.class, rawValue, value -> this.mealFrequency = value);
+            case "foodPreference" -> applied = HealthProfileFieldSupport.setJsonCodeArray(FoodPreference.class, rawValue, value -> this.foodPreference = value);
+            case "sugarIntakeFreq" -> applied = HealthProfileFieldSupport.setEnum(SugarIntakeFreq.class, rawValue, value -> this.sugarIntakeFreq = value);
+            case "caffeineIntake" -> applied = HealthProfileFieldSupport.setBoolean(rawValue, value -> this.caffeineIntake = value);
+            case "exerciseFrequency" -> applied = HealthProfileFieldSupport.setEnum(ExerciseFrequency.class, rawValue, value -> this.exerciseFrequency = value);
+            case "exercisePlace" -> applied = HealthProfileFieldSupport.setJsonCodeArray(ExercisePlace.class, rawValue, value -> this.exercisePlace = value);
             case "exerciseType" -> this.exerciseType = rawValue;
-            case "exerciseDuration" -> applied = setEnum(ExerciseDuration.class, rawValue, value -> this.exerciseDuration = value);
-            case "avgSteps" -> applied = setInteger(rawValue, value -> this.avgSteps = value);
-            case "sleepHours" -> applied = setDecimal(rawValue, value -> this.sleepHours = value);
-            case "sleepQuality" -> applied = setEnum(SleepQuality.class, rawValue, value -> this.sleepQuality = value);
-            case "smokingStatus" -> applied = setBoolean(rawValue, value -> this.smokingStatus = value);
-            case "drinkingFrequency" -> applied = setEnum(DrinkingFrequency.class, rawValue, value -> this.drinkingFrequency = value);
-            case "stressLevel" -> applied = setEnum(StressLevel.class, rawValue, value -> this.stressLevel = value);
+            case "exerciseDuration" -> applied = HealthProfileFieldSupport.setEnum(ExerciseDuration.class, rawValue, value -> this.exerciseDuration = value);
+            case "avgSteps" -> applied = HealthProfileFieldSupport.setInteger(rawValue, value -> this.avgSteps = value);
+            case "sleepHours" -> applied = HealthProfileFieldSupport.setDecimal(rawValue, value -> this.sleepHours = value);
+            case "sleepQuality" -> applied = HealthProfileFieldSupport.setEnum(SleepQuality.class, rawValue, value -> this.sleepQuality = value);
+            case "smokingStatus" -> applied = HealthProfileFieldSupport.setBoolean(rawValue, value -> this.smokingStatus = value);
+            case "drinkingFrequency" -> applied = HealthProfileFieldSupport.setEnum(DrinkingFrequency.class, rawValue, value -> this.drinkingFrequency = value);
+            case "stressLevel" -> applied = HealthProfileFieldSupport.setEnum(StressLevel.class, rawValue, value -> this.stressLevel = value);
             default -> applied = false;
         }
 
@@ -241,200 +233,5 @@ public class HealthProfile extends BaseEntity {
             calculateBmi();
         }
         return applied;
-    }
-
-    public static boolean isSupportedField(String fieldName) {
-        if (fieldName == null || fieldName.isBlank()) {
-            return false;
-        }
-        String key = normalizeFieldName(fieldName);
-        return switch (key) {
-            case "birthDate",
-                    "gender",
-                    "height",
-                    "weight",
-                    "bmi",
-                    "bloodSugarStatus",
-                    "bloodPressureStatus",
-                    "hasFamilyHypertension",
-                    "medications",
-                    "allergies",
-                    "healthGoal",
-                    "mealFrequency",
-                    "foodPreference",
-                    "sugarIntakeFreq",
-                    "caffeineIntake",
-                    "exerciseFrequency",
-                    "exercisePlace",
-                    "exerciseType",
-                    "exerciseDuration",
-                    "avgSteps",
-                    "sleepHours",
-                    "sleepQuality",
-                    "smokingStatus",
-                    "drinkingFrequency",
-                    "stressLevel" -> true;
-            default -> false;
-        };
-    }
-
-    private static String normalizeFieldName(String fieldName) {
-        String trimmed = fieldName.trim();
-        if (!trimmed.contains("_")) {
-            return trimmed;
-        }
-
-        String[] parts = trimmed.toLowerCase(Locale.ROOT).split("_");
-        if (parts.length == 0) {
-            return trimmed;
-        }
-
-        StringBuilder builder = new StringBuilder(parts[0]);
-        for (int i = 1; i < parts.length; i++) {
-            if (parts[i].isEmpty()) {
-                continue;
-            }
-            builder.append(Character.toUpperCase(parts[i].charAt(0)))
-                    .append(parts[i].substring(1));
-        }
-        return builder.toString();
-    }
-
-    private static LocalDate parseDate(String rawValue) {
-        if (rawValue == null || rawValue.isBlank()) {
-            return null;
-        }
-        try {
-            return LocalDate.parse(rawValue.trim(), DateTimeFormatter.ISO_LOCAL_DATE);
-        } catch (DateTimeParseException e) {
-            return null;
-        }
-    }
-
-    private static BigDecimal parseBigDecimal(String rawValue) {
-        if (rawValue == null || rawValue.isBlank()) {
-            return null;
-        }
-        try {
-            return new BigDecimal(rawValue.trim());
-        } catch (NumberFormatException e) {
-            return null;
-        }
-    }
-
-    private static Integer parseInteger(String rawValue) {
-        if (rawValue == null || rawValue.isBlank()) {
-            return null;
-        }
-        try {
-            return Integer.parseInt(rawValue.trim());
-        } catch (NumberFormatException e) {
-            return null;
-        }
-    }
-
-    private static Boolean parseBoolean(String rawValue) {
-        if (rawValue == null || rawValue.isBlank()) {
-            return null;
-        }
-        String normalized = rawValue.trim().toLowerCase(Locale.ROOT);
-        return switch (normalized) {
-            case "true", "1", "yes", "y" -> true;
-            case "false", "0", "no", "n" -> false;
-            default -> null;
-        };
-    }
-
-    private static <E extends Enum<E>> E parseEnum(Class<E> type, String rawValue) {
-        if (rawValue == null || rawValue.isBlank()) {
-            return null;
-        }
-        String normalized = rawValue.trim().toUpperCase(Locale.ROOT).replace(' ', '_');
-        try {
-            return Enum.valueOf(type, normalized);
-        } catch (IllegalArgumentException e) {
-            return null;
-        }
-    }
-
-    private static boolean setDate(String rawValue, java.util.function.Consumer<LocalDate> setter) {
-        LocalDate value = parseDate(rawValue);
-        if (value == null) {
-            return false;
-        }
-        setter.accept(value);
-        return true;
-    }
-
-    private static boolean setDecimal(String rawValue, java.util.function.Consumer<BigDecimal> setter) {
-        BigDecimal value = parseBigDecimal(rawValue);
-        if (value == null) {
-            return false;
-        }
-        setter.accept(value);
-        return true;
-    }
-
-    private static boolean setInteger(String rawValue, java.util.function.Consumer<Integer> setter) {
-        Integer value = parseInteger(rawValue);
-        if (value == null) {
-            return false;
-        }
-        setter.accept(value);
-        return true;
-    }
-
-    private static boolean setBoolean(String rawValue, java.util.function.Consumer<Boolean> setter) {
-        Boolean value = parseBoolean(rawValue);
-        if (value == null) {
-            return false;
-        }
-        setter.accept(value);
-        return true;
-    }
-
-    private static <E extends Enum<E>> boolean setEnum(Class<E> type, String rawValue, java.util.function.Consumer<E> setter) {
-        E value = parseEnum(type, rawValue);
-        if (value == null) {
-            return false;
-        }
-        setter.accept(value);
-        return true;
-    }
-
-    private static <E extends Enum<E>> boolean setJsonCodeArray(
-            Class<E> enumType,
-            String rawValue,
-            java.util.function.Consumer<String> setter
-    ) {
-        if (rawValue == null || rawValue.isBlank()) {
-            return false;
-        }
-        try {
-            List<String> codes = OBJECT_MAPPER.readValue(
-                    rawValue,
-                    new com.fasterxml.jackson.core.type.TypeReference<List<String>>() {}
-            );
-            if (codes.isEmpty()) {
-                return false;
-            }
-            List<String> normalized = new ArrayList<>();
-            for (String code : codes) {
-                if (code == null || code.isBlank()) {
-                    return false;
-                }
-                String value = code.trim().toUpperCase(Locale.ROOT);
-                try {
-                    Enum.valueOf(enumType, value);
-                } catch (IllegalArgumentException e) {
-                    return false;
-                }
-                normalized.add(value);
-            }
-            setter.accept(OBJECT_MAPPER.writeValueAsString(normalized));
-            return true;
-        } catch (IOException e) {
-            return false;
-        }
     }
 }

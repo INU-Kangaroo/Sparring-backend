@@ -28,7 +28,12 @@ spring:
         dialect: org.hibernate.dialect.MySQLDialect
         format_sql: true
         show_sql: true
+        jdbc:
+          time_zone: Asia/Seoul
     open-in-view: false
+
+  jackson:
+    time-zone: Asia/Seoul
 
   # OAuth2 Configuration
   security:
@@ -108,6 +113,12 @@ logging:
     com.kangaroo.sparring: DEBUG
     org.hibernate.SQL: DEBUG
     org.springframework.security: DEBUG
+
+# CORS Configuration
+cors:
+  allowed-origin-patterns:
+    - "*"
+  allow-credentials: false
 
 # Server Configuration
 server:

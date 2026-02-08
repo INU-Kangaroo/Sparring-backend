@@ -21,7 +21,7 @@ public class GlobalExceptionHandler {
         ErrorCode errorCode = e.getErrorCode();
         return ResponseEntity
                 .status(errorCode.getStatus())
-                .body(new ErrorResponse(errorCode.getCode(), errorCode.getMessage()));
+                .body(new ErrorResponse(errorCode.getCode(), errorCode.getMessage(), null));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -35,7 +35,7 @@ public class GlobalExceptionHandler {
 
         return ResponseEntity
                 .badRequest()
-                .body(new ErrorResponse("VALIDATION_ERROR", errors.toString()));
+                .body(new ErrorResponse("VALIDATION_ERROR", "입력값이 올바르지 않습니다.", errors));
     }
 
     @ExceptionHandler(MissingRequestHeaderException.class)
@@ -43,8 +43,9 @@ public class GlobalExceptionHandler {
         log.warn("Missing request header: {}", e.getHeaderName());
         return ResponseEntity
                 .badRequest()
-                .body(new ErrorResponse("MISSING_HEADER", 
-                        String.format("필수 헤더가 누락되었습니다: %s", e.getHeaderName())));
+                .body(new ErrorResponse("MISSING_HEADER",
+                        String.format("필수 헤더가 누락되었습니다: %s", e.getHeaderName()),
+                        null));
     }
 
     @ExceptionHandler(Exception.class)
@@ -52,8 +53,8 @@ public class GlobalExceptionHandler {
         log.error("Exception: ", e);
         return ResponseEntity
                 .internalServerError()
-                .body(new ErrorResponse("INTERNAL_ERROR", "서버 오류가 발생했습니다"));
+                .body(new ErrorResponse("INTERNAL_ERROR", "서버 오류가 발생했습니다", null));
     }
 
-    record ErrorResponse(String code, String message) {}
+    record ErrorResponse(String code, String message, Map<String, String> errors) {}
 }

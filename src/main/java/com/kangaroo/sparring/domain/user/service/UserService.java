@@ -214,9 +214,7 @@ public class UserService {
     @Transactional
     public AuthResponse refreshAccessToken(String refreshToken) {
         // 리프레시 토큰 검증
-        if (!jwtUtil.validateToken(refreshToken)) {
-            throw new CustomException(ErrorCode.INVALID_TOKEN);
-        }
+        jwtUtil.validateTokenOrThrow(refreshToken);
 
         // 토큰 타입 확인
         String tokenType = jwtUtil.getTokenType(refreshToken);
@@ -235,6 +233,10 @@ public class UserService {
         // 사용자 조회
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+
+        if (!user.getIsActive() || user.isDeleted()) {
+            throw new CustomException(ErrorCode.INACTIVE_USER);
+        }
 
         // 새 액세스 토큰 발급
         String newAccessToken = jwtUtil.generateAccessToken(user.getId(), user.getEmail());
@@ -260,9 +262,7 @@ public class UserService {
     @Transactional
     public void logout(String accessToken) {
         // 액세스 토큰 검증
-        if (!jwtUtil.validateToken(accessToken)) {
-            throw new CustomException(ErrorCode.INVALID_TOKEN);
-        }
+        jwtUtil.validateTokenOrThrow(accessToken);
         
         // 토큰 타입 확인 (액세스 토큰인지 검증)
         String tokenType = jwtUtil.getTokenType(accessToken);

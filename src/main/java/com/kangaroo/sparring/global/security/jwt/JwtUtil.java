@@ -2,6 +2,8 @@ package com.kangaroo.sparring.global.security.jwt;
 
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
+import com.kangaroo.sparring.global.exception.CustomException;
+import com.kangaroo.sparring.global.exception.ErrorCode;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -84,9 +86,25 @@ public class JwtUtil {
         try {
             parseClaims(token);
             return true;
+        } catch (ExpiredJwtException e) {
+            log.warn("JWT 만료: {}", e.getMessage());
+            return false;
         } catch (JwtException | IllegalArgumentException e) {
             log.error("JWT 검증 실패: {}", e.getMessage());
             return false;
+        }
+    }
+
+    /**
+     * 토큰 유효성 검증 (예외 발생)
+     */
+    public void validateTokenOrThrow(String token) {
+        try {
+            parseClaims(token);
+        } catch (ExpiredJwtException e) {
+            throw new CustomException(ErrorCode.EXPIRED_TOKEN);
+        } catch (JwtException | IllegalArgumentException e) {
+            throw new CustomException(ErrorCode.INVALID_TOKEN);
         }
     }
 

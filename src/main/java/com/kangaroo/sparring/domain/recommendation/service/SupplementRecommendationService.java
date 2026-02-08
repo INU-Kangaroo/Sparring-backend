@@ -1,14 +1,10 @@
 package com.kangaroo.sparring.domain.recommendation.service;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kangaroo.sparring.domain.healthprofile.entity.HealthProfile;
-import com.kangaroo.sparring.domain.healthprofile.repository.HealthProfileRepository;
 import com.kangaroo.sparring.domain.measurement.entity.BloodPressureLog;
 import com.kangaroo.sparring.domain.measurement.entity.BloodSugarLog;
-import com.kangaroo.sparring.domain.measurement.repository.BloodPressureLogRepository;
-import com.kangaroo.sparring.domain.measurement.repository.BloodSugarLogRepository;
 import com.kangaroo.sparring.domain.recommendation.dto.response.SupplementDto;
 import com.kangaroo.sparring.domain.recommendation.dto.response.SupplementRecommendationResponse;
 import com.kangaroo.sparring.domain.recommendation.entity.SupplementRecommendation;
@@ -17,12 +13,10 @@ import com.kangaroo.sparring.domain.recommendation.repository.SupplementRecommen
 import com.kangaroo.sparring.domain.recommendation.repository.RecommendationRepository;
 import com.kangaroo.sparring.domain.recommendation.type.RecommendationType;
 import com.kangaroo.sparring.domain.user.entity.User;
-import com.kangaroo.sparring.domain.user.repository.UserRepository;
 import com.kangaroo.sparring.global.exception.CustomException;
 import com.kangaroo.sparring.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -40,17 +34,16 @@ public class SupplementRecommendationService {
 
     private final RecommendationRepository recommendationRepository;
     private final SupplementRecommendationRepository supplementRecommendationRepository;
-    private final UserRepository userRepository;
-    private final HealthProfileRepository healthProfileRepository;
-    private final BloodSugarLogRepository bloodSugarLogRepository;
-    private final BloodPressureLogRepository bloodPressureLogRepository;
     private final GeminiApiClient geminiApiClient;
     private final ObjectMapper objectMapper;
     private final RecommendationPersistenceService recommendationPersistenceService;
     private final RecommendationPromptTemplateService promptTemplateService;
+    private final RecommendationContextService recommendationContextService;
+    private final RecommendationJsonMappingSupport jsonMappingSupport;
+    private final RecommendationParsingSupport parsingSupport;
 
     public SupplementRecommendationResponse getSupplementRecommendations(Long userId) {
-        User user = findUserById(userId);
+        User user = recommendationContextService.getUser(userId);
         LocalDateTime cacheThreshold = LocalDateTime.now().minusHours(CACHE_HOURS);
 
         return recommendationRepository
@@ -64,20 +57,16 @@ public class SupplementRecommendationService {
     }
 
     public SupplementRecommendationResponse refreshSupplementRecommendations(Long userId) {
-        User user = findUserById(userId);
+        User user = recommendationContextService.getUser(userId);
         return generateNewSupplementRecommendations(user);
     }
 
     private SupplementRecommendationResponse generateNewSupplementRecommendations(User user) {
-        HealthProfile healthProfile = findHealthProfileByUserId(user.getId());
-        List<BloodSugarLog> recentBloodSugars = bloodSugarLogRepository.findRecentByUserId(
-                user.getId(),
-                PageRequest.of(0, RECENT_MEASUREMENT_COUNT)
-        );
-        List<BloodPressureLog> recentBloodPressures = bloodPressureLogRepository.findRecentByUserId(
-                user.getId(),
-                PageRequest.of(0, RECENT_MEASUREMENT_COUNT)
-        );
+        HealthProfile healthProfile = recommendationContextService.getOrCreateHealthProfile(user.getId());
+        List<BloodSugarLog> recentBloodSugars =
+                recommendationContextService.getRecentBloodSugars(user.getId(), RECENT_MEASUREMENT_COUNT);
+        List<BloodPressureLog> recentBloodPressures =
+                recommendationContextService.getRecentBloodPressures(user.getId(), RECENT_MEASUREMENT_COUNT);
 
         String prompt = buildSupplementPrompt(healthProfile, recentBloodSugars, recentBloodPressures);
         String geminiResponse = geminiApiClient.generateContent(prompt);
@@ -104,7 +93,11 @@ public class SupplementRecommendationService {
 
     private SupplementRecommendationResponse parseSupplementResponse(String geminiResponse) {
         try {
-            JsonNode root = objectMapper.readTree(RecommendationJsonSupport.extractJsonObject(geminiResponse));
+            JsonNode root = parsingSupport.readTreeOrThrow(
+                    RecommendationJsonSupport.extractJsonObject(geminiResponse),
+                    geminiResponse,
+                    "Gemini 영양제 추천 응답"
+            );
             List<SupplementDto> supplements = new ArrayList<>();
             JsonNode supplementsNode = resolveSupplementsNode(root);
 
@@ -115,14 +108,16 @@ public class SupplementRecommendationService {
                             node.path("dosage").asText(),
                             node.path("frequency").asText(),
                             readBenefits(node),
-                            readPrecautions(node)
+                            jsonMappingSupport.readPrecautions(node)
                     ));
                 }
             }
 
             return SupplementRecommendationResponse.of(supplements);
+        } catch (CustomException e) {
+            throw e;
         } catch (Exception e) {
-            log.error("Gemini 응답 파싱 실패: body={}", RecommendationJsonSupport.abbreviate(geminiResponse), e);
+            log.error("영양제 추천 처리 실패: body={}", RecommendationJsonSupport.abbreviate(geminiResponse), e);
             throw new CustomException(ErrorCode.INTERNAL_SERVER_ERROR);
         }
     }
@@ -136,8 +131,8 @@ public class SupplementRecommendationService {
                     dto.getName(),
                     dto.getDosage(),
                     dto.getFrequency(),
-                    writeAsJson(dto.getBenefits()),
-                    writeAsJson(dto.getPrecautions())
+                    jsonMappingSupport.writeAsJson(dto.getBenefits()),
+                    jsonMappingSupport.writeAsJson(dto.getPrecautions())
             ));
         }
 
@@ -153,27 +148,11 @@ public class SupplementRecommendationService {
                         n.getDosage(),
                         n.getFrequency(),
                         readBenefitsText(n.getBenefits()),
-                        readJsonArray(n.getPrecautions())
+                        jsonMappingSupport.readJsonArray(n.getPrecautions())
                 ))
                 .toList();
 
         return SupplementRecommendationResponse.of(supplementDtos);
-    }
-
-    private User findUserById(Long userId) {
-        return userRepository.findById(userId)
-                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
-    }
-
-    private HealthProfile findHealthProfileByUserId(Long userId) {
-        return healthProfileRepository.findByUserId(userId)
-                .orElseGet(() -> {
-                    User user = findUserById(userId);
-                    HealthProfile healthProfile = HealthProfile.builder()
-                            .user(user)
-                            .build();
-                    return healthProfileRepository.save(healthProfile);
-                });
     }
 
     private JsonNode resolveSupplementsNode(JsonNode root) {
@@ -192,39 +171,6 @@ public class SupplementRecommendationService {
             return nutrientsNode;
         }
         return objectMapper.createArrayNode();
-    }
-
-    private List<String> readPrecautions(JsonNode node) {
-        List<String> precautions = RecommendationArraySupport.readStringArray(node.path("precautions"));
-        if (!precautions.isEmpty()) {
-            return precautions;
-        }
-        String single = node.path("precaution").asText("");
-        if (!single.isBlank()) {
-            return List.of(single);
-        }
-        return List.of();
-    }
-
-    private String writeAsJson(List<String> values) {
-        try {
-            return objectMapper.writeValueAsString(values == null ? List.of() : values);
-        } catch (JsonProcessingException e) {
-            throw new CustomException(ErrorCode.INTERNAL_SERVER_ERROR);
-        }
-    }
-
-    private List<String> readJsonArray(String raw) {
-        if (raw == null || raw.isBlank()) {
-            return List.of();
-        }
-        try {
-            JsonNode node = objectMapper.readTree(raw);
-            return RecommendationArraySupport.readStringArray(node);
-        } catch (Exception e) {
-            log.warn("영양제 문자열 배열 역직렬화 실패: value={}", raw);
-            return List.of();
-        }
     }
 
     private List<String> readBenefits(JsonNode node) {

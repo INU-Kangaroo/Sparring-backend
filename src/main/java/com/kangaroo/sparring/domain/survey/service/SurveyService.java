@@ -8,6 +8,8 @@ import com.kangaroo.sparring.domain.survey.dto.res.SurveyQuestionsResponse;
 import com.kangaroo.sparring.domain.survey.dto.res.SurveySubmitResponse;
 
 import com.kangaroo.sparring.domain.healthprofile.entity.HealthProfile;
+import com.kangaroo.sparring.domain.healthprofile.service.HealthProfileService;
+import com.kangaroo.sparring.domain.healthprofile.support.HealthProfileFieldSupport;
 import com.kangaroo.sparring.domain.healthprofile.repository.HealthProfileRepository;
 import com.kangaroo.sparring.domain.survey.entity.Answer;
 import com.kangaroo.sparring.domain.survey.entity.Question;
@@ -43,6 +45,7 @@ public class SurveyService {
     private final HealthProfileRepository healthProfileRepository;
     private final UserRepository userRepository;
     private final SurveyAnswerValidator surveyAnswerValidator;
+    private final HealthProfileService healthProfileService;
 
     /**
      * 설문 문항 조회
@@ -152,7 +155,7 @@ public class SurveyService {
      * HealthProfile 생성 또는 업데이트
      */
     private void updateHealthProfile(Long userId, SurveyType surveyType, List<Answer> answers) {
-        HealthProfile healthProfile = getOrCreateHealthProfile(userId);
+        HealthProfile healthProfile = healthProfileService.getOrCreateHealthProfile(userId);
 
         // 설문 타입에 따라 HealthProfile 업데이트
         if (surveyType == SurveyType.BASIC || surveyType == SurveyType.DETAILED) {
@@ -170,14 +173,14 @@ public class SurveyService {
      * 단일 답변으로 HealthProfile 업데이트 (수정 시)
      */
     private void updateHealthProfileFromSingleAnswer(Long userId, Answer answer) {
-        HealthProfile healthProfile = getOrCreateHealthProfile(userId);
+        HealthProfile healthProfile = healthProfileService.getOrCreateHealthProfile(userId);
 
         String fieldName = answer.getQuestion().getHealthProfileField();
         if (fieldName == null || fieldName.isBlank()) {
             return;
         }
 
-        if (!HealthProfile.isSupportedField(fieldName)) {
+        if (!HealthProfileFieldSupport.isSupportedField(fieldName)) {
             throw new CustomException(ErrorCode.INVALID_INPUT, "지원하지 않는 healthProfileField: " + fieldName);
         }
 
@@ -199,7 +202,7 @@ public class SurveyService {
             if (fieldName == null || fieldName.isBlank()) {
                 continue;
             }
-            if (!HealthProfile.isSupportedField(fieldName)) {
+            if (!HealthProfileFieldSupport.isSupportedField(fieldName)) {
                 invalidFields.add(fieldName);
                 continue;
             }
@@ -217,15 +220,4 @@ public class SurveyService {
         }
     }
 
-    private HealthProfile getOrCreateHealthProfile(Long userId) {
-        return healthProfileRepository.findByUserId(userId)
-                .orElseGet(() -> {
-                    User user = userRepository.findById(userId)
-                            .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
-                    HealthProfile healthProfile = HealthProfile.builder()
-                            .user(user)
-                            .build();
-                    return healthProfileRepository.save(healthProfile);
-                });
-    }
 }

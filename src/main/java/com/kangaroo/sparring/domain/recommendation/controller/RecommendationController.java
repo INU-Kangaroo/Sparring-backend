@@ -5,6 +5,8 @@ import com.kangaroo.sparring.domain.recommendation.dto.response.ExerciseRecommen
 import com.kangaroo.sparring.domain.recommendation.dto.response.SupplementRecommendationResponse;
 import com.kangaroo.sparring.domain.recommendation.service.ExerciseRecommendationService;
 import com.kangaroo.sparring.domain.recommendation.service.SupplementRecommendationService;
+import com.kangaroo.sparring.global.exception.CustomException;
+import com.kangaroo.sparring.global.exception.ErrorCode;
 import com.kangaroo.sparring.global.security.principal.UserIdPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -29,8 +31,9 @@ public class RecommendationController {
             @AuthenticationPrincipal UserIdPrincipal principal,
             @Valid @RequestBody ExerciseRecommendationRequest request
     ) {
+        Long userId = resolveUserId(principal);
         ExerciseRecommendationResponse response = exerciseRecommendationService
-                .getExerciseRecommendations(principal.getUserId(), request);
+                .getExerciseRecommendations(userId, request);
         return ResponseEntity.ok(response);
     }
 
@@ -40,8 +43,9 @@ public class RecommendationController {
             @AuthenticationPrincipal UserIdPrincipal principal,
             @Valid @RequestBody ExerciseRecommendationRequest request
     ) {
+        Long userId = resolveUserId(principal);
         ExerciseRecommendationResponse response = exerciseRecommendationService
-                .refreshExerciseRecommendations(principal.getUserId(), request);
+                .refreshExerciseRecommendations(userId, request);
         return ResponseEntity.ok(response);
     }
 
@@ -50,8 +54,9 @@ public class RecommendationController {
     public ResponseEntity<SupplementRecommendationResponse> getSupplementRecommendations(
             @AuthenticationPrincipal UserIdPrincipal principal
     ) {
+        Long userId = resolveUserId(principal);
         SupplementRecommendationResponse response = supplementRecommendationService
-                .getSupplementRecommendations(principal.getUserId());
+                .getSupplementRecommendations(userId);
         return ResponseEntity.ok(response);
     }
 
@@ -60,8 +65,16 @@ public class RecommendationController {
     public ResponseEntity<SupplementRecommendationResponse> refreshSupplementRecommendations(
             @AuthenticationPrincipal UserIdPrincipal principal
     ) {
+        Long userId = resolveUserId(principal);
         SupplementRecommendationResponse response = supplementRecommendationService
-                .refreshSupplementRecommendations(principal.getUserId());
+                .refreshSupplementRecommendations(userId);
         return ResponseEntity.ok(response);
+    }
+
+    private Long resolveUserId(UserIdPrincipal principal) {
+        if (principal == null) {
+            throw new CustomException(ErrorCode.UNAUTHORIZED);
+        }
+        return principal.getUserId();
     }
 }

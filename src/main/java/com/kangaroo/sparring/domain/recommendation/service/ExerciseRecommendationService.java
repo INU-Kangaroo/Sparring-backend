@@ -1,14 +1,10 @@
 package com.kangaroo.sparring.domain.recommendation.service;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kangaroo.sparring.domain.healthprofile.entity.HealthProfile;
-import com.kangaroo.sparring.domain.healthprofile.repository.HealthProfileRepository;
 import com.kangaroo.sparring.domain.measurement.entity.BloodPressureLog;
 import com.kangaroo.sparring.domain.measurement.entity.BloodSugarLog;
-import com.kangaroo.sparring.domain.measurement.repository.BloodPressureLogRepository;
-import com.kangaroo.sparring.domain.measurement.repository.BloodSugarLogRepository;
 import com.kangaroo.sparring.domain.recommendation.dto.request.ExerciseRecommendationRequest;
 import com.kangaroo.sparring.domain.recommendation.dto.response.CardiacExerciseDto;
 import com.kangaroo.sparring.domain.recommendation.dto.response.ExerciseRecommendationResponse;
@@ -20,12 +16,10 @@ import com.kangaroo.sparring.domain.recommendation.repository.RecommendationRepo
 import com.kangaroo.sparring.domain.recommendation.type.ExerciseType;
 import com.kangaroo.sparring.domain.recommendation.type.RecommendationType;
 import com.kangaroo.sparring.domain.user.entity.User;
-import com.kangaroo.sparring.domain.user.repository.UserRepository;
 import com.kangaroo.sparring.global.exception.CustomException;
 import com.kangaroo.sparring.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -47,17 +41,16 @@ public class ExerciseRecommendationService {
 
     private final RecommendationRepository recommendationRepository;
     private final ExerciseRecommendationRepository exerciseRecommendationRepository;
-    private final UserRepository userRepository;
-    private final HealthProfileRepository healthProfileRepository;
-    private final BloodSugarLogRepository bloodSugarLogRepository;
-    private final BloodPressureLogRepository bloodPressureLogRepository;
     private final GeminiApiClient geminiApiClient;
     private final ObjectMapper objectMapper;
     private final RecommendationPersistenceService recommendationPersistenceService;
     private final RecommendationPromptTemplateService promptTemplateService;
+    private final RecommendationContextService recommendationContextService;
+    private final RecommendationJsonMappingSupport jsonMappingSupport;
+    private final RecommendationParsingSupport parsingSupport;
 
     public ExerciseRecommendationResponse getExerciseRecommendations(Long userId, ExerciseRecommendationRequest request) {
-        User user = findUserById(userId);
+        User user = recommendationContextService.getUser(userId);
         LocalDateTime cacheThreshold = LocalDateTime.now().minusHours(CACHE_HOURS);
 
         return recommendationRepository
@@ -74,20 +67,16 @@ public class ExerciseRecommendationService {
     }
 
     public ExerciseRecommendationResponse refreshExerciseRecommendations(Long userId, ExerciseRecommendationRequest request) {
-        User user = findUserById(userId);
+        User user = recommendationContextService.getUser(userId);
         return generateNewExerciseRecommendations(user, request);
     }
 
     private ExerciseRecommendationResponse generateNewExerciseRecommendations(User user, ExerciseRecommendationRequest request) {
-        HealthProfile healthProfile = findHealthProfileByUserId(user.getId());
-        List<BloodSugarLog> recentBloodSugars = bloodSugarLogRepository.findRecentByUserId(
-                user.getId(),
-                PageRequest.of(0, RECENT_MEASUREMENT_COUNT)
-        );
-        List<BloodPressureLog> recentBloodPressures = bloodPressureLogRepository.findRecentByUserId(
-                user.getId(),
-                PageRequest.of(0, RECENT_MEASUREMENT_COUNT)
-        );
+        HealthProfile healthProfile = recommendationContextService.getOrCreateHealthProfile(user.getId());
+        List<BloodSugarLog> recentBloodSugars =
+                recommendationContextService.getRecentBloodSugars(user.getId(), RECENT_MEASUREMENT_COUNT);
+        List<BloodPressureLog> recentBloodPressures =
+                recommendationContextService.getRecentBloodPressures(user.getId(), RECENT_MEASUREMENT_COUNT);
 
         String prompt = buildExercisePrompt(healthProfile, recentBloodSugars, recentBloodPressures, request);
         String geminiResponse = geminiApiClient.generateContent(prompt);
@@ -124,7 +113,7 @@ public class ExerciseRecommendationService {
     private ExerciseRecommendationResponse parseExerciseResponse(String geminiResponse) {
         try {
             String sanitizedJson = sanitizeRangeNumberFields(RecommendationJsonSupport.extractJsonObject(geminiResponse));
-            JsonNode root = objectMapper.readTree(sanitizedJson);
+            JsonNode root = parsingSupport.readTreeOrThrow(sanitizedJson, geminiResponse, "Gemini 운동 추천 응답");
 
             List<CardiacExerciseDto> cardiacExercises = new ArrayList<>();
             JsonNode cardiacNode = root.path("cardiacExercises");
@@ -136,7 +125,7 @@ public class ExerciseRecommendationService {
                             node.path("duration").asText(),
                             caloriesRange.minCalories(),
                             caloriesRange.maxCalories(),
-                            readPrecautions(node)
+                            jsonMappingSupport.readPrecautions(node)
                     ));
                 }
             }
@@ -149,14 +138,16 @@ public class ExerciseRecommendationService {
                             node.path("name").asText(),
                             node.path("duration").asText(),
                             node.path("frequency").asText(),
-                            readPrecautions(node)
+                            jsonMappingSupport.readPrecautions(node)
                     ));
                 }
             }
 
             return ExerciseRecommendationResponse.of(cardiacExercises, strengthExercises);
+        } catch (CustomException e) {
+            throw e;
         } catch (Exception e) {
-            log.error("Gemini 응답 파싱 실패: body={}", RecommendationJsonSupport.abbreviate(geminiResponse), e);
+            log.error("운동 추천 처리 실패: body={}", RecommendationJsonSupport.abbreviate(geminiResponse), e);
             throw new CustomException(ErrorCode.INTERNAL_SERVER_ERROR);
         }
     }
@@ -173,7 +164,7 @@ public class ExerciseRecommendationService {
                     dto.getMinCalories(),
                     dto.getMaxCalories(),
                     null,
-                    writeAsJson(dto.getPrecautions())
+                    jsonMappingSupport.writeAsJson(dto.getPrecautions())
             ));
         }
 
@@ -186,7 +177,7 @@ public class ExerciseRecommendationService {
                     null,
                     null,
                     dto.getFrequency(),
-                    writeAsJson(dto.getPrecautions())
+                    jsonMappingSupport.writeAsJson(dto.getPrecautions())
             ));
         }
 
@@ -203,7 +194,7 @@ public class ExerciseRecommendationService {
                         e.getDuration(),
                         e.getMinCalories(),
                         e.getMaxCalories(),
-                        readJsonArray(e.getPrecautions())
+                        jsonMappingSupport.readJsonArray(e.getPrecautions())
                 ))
                 .toList();
 
@@ -213,27 +204,11 @@ public class ExerciseRecommendationService {
                         e.getName(),
                         e.getDuration(),
                         e.getFrequency(),
-                        readJsonArray(e.getPrecautions())
+                        jsonMappingSupport.readJsonArray(e.getPrecautions())
                 ))
                 .toList();
 
         return ExerciseRecommendationResponse.of(cardiacExercises, strengthExercises);
-    }
-
-    private User findUserById(Long userId) {
-        return userRepository.findById(userId)
-                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
-    }
-
-    private HealthProfile findHealthProfileByUserId(Long userId) {
-        return healthProfileRepository.findByUserId(userId)
-                .orElseGet(() -> {
-                    User user = findUserById(userId);
-                    HealthProfile healthProfile = HealthProfile.builder()
-                            .user(user)
-                            .build();
-                    return healthProfileRepository.save(healthProfile);
-                });
     }
 
     private String sanitizeRangeNumberFields(String json) {
@@ -293,43 +268,6 @@ public class ExerciseRecommendationService {
             numbers.add(Integer.parseInt(matcher.group()));
         }
         return numbers;
-    }
-
-    private List<String> readPrecautions(JsonNode node) {
-        List<String> precautions = RecommendationArraySupport.readStringArray(node.path("precautions"));
-        if (!precautions.isEmpty()) {
-            return precautions;
-        }
-        String single = node.path("precaution").asText("");
-        if (!single.isBlank()) {
-            return List.of(single);
-        }
-        return List.of();
-    }
-
-    private String writeAsJson(List<String> values) {
-        try {
-            return objectMapper.writeValueAsString(values == null ? List.of() : values);
-        } catch (JsonProcessingException e) {
-            throw new CustomException(ErrorCode.INTERNAL_SERVER_ERROR);
-        }
-    }
-
-    private List<String> readJsonArray(String raw) {
-        if (raw == null || raw.isBlank()) {
-            return List.of();
-        }
-        String trimmed = raw.trim();
-        if (!trimmed.startsWith("[")) {
-            return List.of(trimmed);
-        }
-        try {
-            JsonNode node = objectMapper.readTree(trimmed);
-            return RecommendationArraySupport.readStringArray(node);
-        } catch (Exception e) {
-            log.warn("운동 주의사항 역직렬화 실패: value={}", raw);
-            return List.of();
-        }
     }
 
     private record CaloriesRange(Integer minCalories, Integer maxCalories) {

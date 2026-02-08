@@ -2,6 +2,8 @@ package com.kangaroo.sparring.global.security.jwt;
 
 import com.kangaroo.sparring.domain.user.entity.User;
 import com.kangaroo.sparring.domain.user.repository.UserRepository;
+import com.kangaroo.sparring.global.exception.CustomException;
+import com.kangaroo.sparring.global.exception.ErrorCode;
 import com.kangaroo.sparring.global.security.principal.CurrentUser;
 import com.kangaroo.sparring.global.security.principal.SecurityAuthorities;
 import jakarta.servlet.FilterChain;
@@ -44,39 +46,58 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             FilterChain filterChain
     ) throws ServletException, IOException {
         String token = resolveToken(request);
-        if (token != null && jwtUtil.validateToken(token)) {
-            String tokenType = jwtUtil.getTokenType(token);
-            if (!"access".equals(tokenType)) {
-                authenticationEntryPoint.commence(
-                        request,
-                        response,
-                        new InsufficientAuthenticationException("액세스 토큰이 아닙니다.")
-                );
+        if (token != null) {
+            try {
+                jwtUtil.validateTokenOrThrow(token);
+
+                String tokenType = jwtUtil.getTokenType(token);
+                if (!"access".equals(tokenType)) {
+                    authenticationEntryPoint.commence(
+                            request,
+                            response,
+                            new InsufficientAuthenticationException("액세스 토큰이 아닙니다.")
+                    );
+                    return;
+                }
+                Long userId = jwtUtil.getUserIdFromToken(token);
+                User user = userRepository.findById(userId).orElse(null);
+
+                if (user == null) {
+                    authenticationEntryPoint.commence(
+                            request,
+                            response,
+                            new InsufficientAuthenticationException("사용자를 찾을 수 없습니다.")
+                    );
+                    return;
+                }
+
+                if (!user.getIsActive() || user.isDeleted()) {
+                    accessDeniedHandler.handle(
+                            request,
+                            response,
+                            new AccessDeniedException("비활성 또는 삭제된 사용자입니다.")
+                    );
+                    return;
+                }
+
+                UsernamePasswordAuthenticationToken authentication = buildAuthentication(user, request);
+                SecurityContextHolder.getContext().setAuthentication(authentication);
+            } catch (CustomException e) {
+                if (e.getErrorCode() == ErrorCode.EXPIRED_TOKEN) {
+                    authenticationEntryPoint.commence(
+                            request,
+                            response,
+                            new InsufficientAuthenticationException("만료된 토큰입니다.")
+                    );
+                } else {
+                    authenticationEntryPoint.commence(
+                            request,
+                            response,
+                            new InsufficientAuthenticationException("유효하지 않은 토큰입니다.")
+                    );
+                }
                 return;
             }
-            Long userId = jwtUtil.getUserIdFromToken(token);
-            User user = userRepository.findById(userId).orElse(null);
-
-            if (user == null) {
-                authenticationEntryPoint.commence(
-                        request,
-                        response,
-                        new InsufficientAuthenticationException("사용자를 찾을 수 없습니다.")
-                );
-                return;
-            }
-
-            if (!user.getIsActive() || user.isDeleted()) {
-                accessDeniedHandler.handle(
-                        request,
-                        response,
-                        new AccessDeniedException("비활성 또는 삭제된 사용자입니다.")
-                );
-                return;
-            }
-
-            UsernamePasswordAuthenticationToken authentication = buildAuthentication(user, request);
-            SecurityContextHolder.getContext().setAuthentication(authentication);
         }
 
         filterChain.doFilter(request, response);

@@ -4,7 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.kangaroo.sparring.domain.healthprofile.entity.HealthProfile;
+import com.kangaroo.sparring.domain.healthprofile.support.HealthProfileFieldSupport;
 import com.kangaroo.sparring.domain.survey.dto.req.SurveySubmitRequest;
 import com.kangaroo.sparring.domain.survey.dto.res.OptionItem;
 import com.kangaroo.sparring.domain.survey.entity.Question;
@@ -36,7 +36,7 @@ public class SurveyAnswerValidator {
             if (fieldName == null || fieldName.isBlank()) {
                 continue;
             }
-            if (!HealthProfile.isSupportedField(fieldName)) {
+            if (!HealthProfileFieldSupport.isSupportedField(fieldName)) {
                 invalidFields.add(question.getQuestionKey() + ":" + fieldName);
             }
         }

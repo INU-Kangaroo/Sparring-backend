@@ -4,6 +4,7 @@ import com.kangaroo.sparring.domain.user.dto.req.EmailRequest;
 import com.kangaroo.sparring.domain.user.dto.req.LoginRequest;
 import com.kangaroo.sparring.domain.user.dto.req.OAuth2CodeRequest;
 import com.kangaroo.sparring.domain.user.dto.req.SignupRequest;
+import com.kangaroo.sparring.domain.user.dto.req.SocialSignupCompleteRequest;
 import com.kangaroo.sparring.domain.user.dto.req.VerifyCodeRequest;
 import com.kangaroo.sparring.domain.user.dto.res.AuthResponse;
 import com.kangaroo.sparring.domain.user.dto.res.EmailResponse;
@@ -12,6 +13,8 @@ import com.kangaroo.sparring.global.email.EmailService;
 import com.kangaroo.sparring.global.email.EmailVerificationResult;
 import com.kangaroo.sparring.global.exception.CustomException;
 import com.kangaroo.sparring.global.exception.ErrorCode;
+import com.kangaroo.sparring.global.response.MessageResponse;
+import com.kangaroo.sparring.global.security.principal.PrincipalResolver;
 import com.kangaroo.sparring.global.security.principal.UserIdPrincipal;
 import com.kangaroo.sparring.global.security.oauth2.service.OAuth2CodeAuthService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -127,6 +130,50 @@ public class AuthController {
      * 회원가입
      */
     @Operation(summary = "회원가입", description = "이메일/비밀번호 회원가입 (이메일 인증 필요)")
+    @ApiResponses({
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "OK",
+                    content = @Content(
+                            mediaType = "application/json",
+                            examples = @ExampleObject(
+                                    name = "Success",
+                                    value = """
+                                            {
+                                              "email": "test@example.com",
+                                              "message": "회원가입이 완료되었습니다."
+                                            }
+                                            """
+                            )
+                    )
+            )
+    })
+    @io.swagger.v3.oas.annotations.parameters.RequestBody(
+            required = true,
+            content = @Content(
+                    mediaType = "application/json",
+                    examples = @ExampleObject(
+                            name = "Signup",
+                            value = """
+                                    {
+                                      "email": "test@example.com",
+                                      "password": "password123!",
+                                      "username": "홍길동",
+                                      "birthDate": "1995-03-10",
+                                      "gender": "MALE",
+                                      "height": 175.5,
+                                      "weight": 70.2,
+                                      "bloodSugarStatus": "NORMAL",
+                                      "bloodPressureStatus": "NORMAL",
+                                      "medications": "없음",
+                                      "allergies": "없음",
+                                      "healthGoal": "혈당 관리",
+                                      "hasFamilyHypertension": false
+                                    }
+                                    """
+                    )
+            )
+    )
     @PostMapping("/signup")
     public ResponseEntity<EmailResponse> signup(@Valid @RequestBody SignupRequest request) {
         userService.signup(request);
@@ -175,6 +222,36 @@ public class AuthController {
         return ResponseEntity.ok(response);
     }
 
+    @Operation(summary = "소셜 회원가입 완료", description = "소셜 로그인 후 기본 프로필 입력으로 회원가입 완료 처리")
+    @ApiResponses({
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "OK",
+                    content = @Content(
+                            mediaType = "application/json",
+                            examples = @ExampleObject(
+                                    name = "Success",
+                                    value = """
+                                            {
+                                              "email": "test@example.com",
+                                              "message": "회원가입이 완료되었습니다."
+                                            }
+                                            """
+                            )
+                    )
+            )
+    })
+    @PostMapping("/social/complete")
+    public ResponseEntity<EmailResponse> completeSocialSignup(
+            @AuthenticationPrincipal UserIdPrincipal principal,
+            @Valid @RequestBody SocialSignupCompleteRequest request
+    ) {
+        Long userId = PrincipalResolver.resolveUserId(principal);
+        userService.completeSocialSignup(userId, request);
+        String email = userService.getUserOrThrow(userId).getEmail();
+        return ResponseEntity.ok(EmailResponse.of(email, "회원가입이 완료되었습니다."));
+    }
+
     /**
      * 액세스 토큰 갱신
      */
@@ -197,12 +274,31 @@ public class AuthController {
      */
     @PostMapping("/logout")
     @Operation(summary = "로그아웃", description = "리프레시 토큰 무효화")
-    public ResponseEntity<Void> logout(@RequestHeader("Authorization") String accessToken) {
+    @ApiResponses({
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "OK",
+                    content = @Content(
+                            mediaType = "application/json",
+                            examples = @ExampleObject(
+                                    name = "Success",
+                                    value = """
+                                            {
+                                              "message": "로그아웃이 완료되었습니다."
+                                            }
+                                            """
+                            )
+                    )
+            )
+    })
+    public ResponseEntity<MessageResponse> logout(@RequestHeader("Authorization") String accessToken) {
         if (accessToken.startsWith("Bearer ")) {
             accessToken = accessToken.substring(7);
         }
 
         userService.logout(accessToken);
-        return ResponseEntity.ok().build();
+        return ResponseEntity.ok(MessageResponse.of("로그아웃이 완료되었습니다."));
     }
+
+    
 }

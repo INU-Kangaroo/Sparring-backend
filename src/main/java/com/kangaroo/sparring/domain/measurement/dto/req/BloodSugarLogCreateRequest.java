@@ -1,4 +1,4 @@
-package com.kangaroo.sparring.domain.measurement.dto.request;
+package com.kangaroo.sparring.domain.measurement.dto.req;
 
 import com.kangaroo.sparring.domain.measurement.type.BloodSugarMeasurementType;
 import io.swagger.v3.oas.annotations.media.Schema;

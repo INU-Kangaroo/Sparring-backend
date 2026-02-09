@@ -1,4 +1,4 @@
-package com.kangaroo.sparring.domain.measurement.dto.response;
+package com.kangaroo.sparring.domain.measurement.dto.res;
 
 import com.kangaroo.sparring.domain.measurement.entity.BloodSugarLog;
 import com.kangaroo.sparring.domain.measurement.type.BloodSugarMeasurementType;

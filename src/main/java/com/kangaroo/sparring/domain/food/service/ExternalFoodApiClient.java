@@ -17,18 +17,13 @@ import java.util.List;
 @Slf4j
 public class ExternalFoodApiClient {
 
-    // TODO: 식품의약품안전처 또는 농촌진흥청 API 연동
-    // - API 키 설정
-    // - HTTP 클라이언트 설정
-    // - 검색 및 파싱 로직
-    // - DB 캐싱 로직
+    // 외부 API 연동 전까지는 빈 결과를 반환
 
     /**
      * 외부 API로 음식 검색 및 캐싱
      */
     public List<Food> searchAndCache(String keyword) {
-        log.info("외부 API 호출 (미구현): keyword={}", keyword);
-        // TODO: 구현 예정
+        log.info("외부 API 미연동 상태: keyword={}", keyword);
         return Collections.emptyList();
     }
 }

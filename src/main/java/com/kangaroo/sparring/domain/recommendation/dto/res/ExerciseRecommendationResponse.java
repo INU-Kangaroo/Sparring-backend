@@ -1,4 +1,4 @@
-package com.kangaroo.sparring.domain.recommendation.dto.response;
+package com.kangaroo.sparring.domain.recommendation.dto.res;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Builder;

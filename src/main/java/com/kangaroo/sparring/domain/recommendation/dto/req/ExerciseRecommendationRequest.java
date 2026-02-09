@@ -1,4 +1,4 @@
-package com.kangaroo.sparring.domain.recommendation.dto.request;
+package com.kangaroo.sparring.domain.recommendation.dto.req;
 
 import com.kangaroo.sparring.domain.recommendation.type.ExerciseDuration;
 import com.kangaroo.sparring.domain.recommendation.type.ExerciseIntensity;

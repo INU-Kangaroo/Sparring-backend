@@ -1,4 +1,4 @@
-package com.kangaroo.sparring.domain.recommendation.dto.request;
+package com.kangaroo.sparring.domain.recommendation.dto.req;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Getter;

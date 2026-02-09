@@ -127,49 +127,6 @@ public class HealthProfile extends BaseEntity {
         }
     }
 
-    // 비즈니스 메서드 - 기본 설문 업데이트
-    public void updateFromBasicSurvey(
-            LocalDate birthDate, Gender gender, BigDecimal height, BigDecimal weight,
-            BloodSugarStatus bloodSugarStatus, BloodPressureStatus bloodPressureStatus,
-            String medications, String allergies, String healthGoal, Boolean hasFamilyHypertension
-    ) {
-        this.birthDate = birthDate;
-        this.gender = gender;
-        this.height = height;
-        this.weight = weight;
-        this.bloodSugarStatus = bloodSugarStatus;
-        this.bloodPressureStatus = bloodPressureStatus;
-        this.medications = medications;
-        this.allergies = allergies;
-        this.healthGoal = healthGoal;
-        this.hasFamilyHypertension = hasFamilyHypertension;
-        calculateBmi();
-    }
-
-    // 비즈니스 메서드 - 상세 설문 업데이트
-    public void updateFromDetailedSurvey(
-            MealFrequency mealFrequency, String foodPreference, SugarIntakeFreq sugarIntakeFreq,
-            Boolean caffeineIntake, ExerciseFrequency exerciseFrequency, String exercisePlace,
-            String exerciseType, ExerciseDuration exerciseDuration, Integer avgSteps,
-            BigDecimal sleepHours, SleepQuality sleepQuality, Boolean smokingStatus,
-            DrinkingFrequency drinkingFrequency, StressLevel stressLevel
-    ) {
-        this.mealFrequency = mealFrequency;
-        this.foodPreference = foodPreference;
-        this.sugarIntakeFreq = sugarIntakeFreq;
-        this.caffeineIntake = caffeineIntake;
-        this.exerciseFrequency = exerciseFrequency;
-        this.exercisePlace = exercisePlace;
-        this.exerciseType = exerciseType;
-        this.exerciseDuration = exerciseDuration;
-        this.avgSteps = avgSteps;
-        this.sleepHours = sleepHours;
-        this.sleepQuality = sleepQuality;
-        this.smokingStatus = smokingStatus;
-        this.drinkingFrequency = drinkingFrequency;
-        this.stressLevel = stressLevel;
-    }
-
     // 비즈니스 메서드 - 사용자 직접 업데이트 (부분 업데이트)
     public void updateProfile(
             LocalDate birthDate, Gender gender, BigDecimal height, BigDecimal weight,

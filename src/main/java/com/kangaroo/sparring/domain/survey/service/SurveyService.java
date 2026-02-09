@@ -3,6 +3,7 @@ package com.kangaroo.sparring.domain.survey.service;
 import com.kangaroo.sparring.domain.survey.dto.req.SurveySubmitRequest;
 import com.kangaroo.sparring.domain.survey.dto.req.UpdateAnswerRequest;
 import com.kangaroo.sparring.domain.survey.dto.res.AnswerResponse;
+import com.kangaroo.sparring.domain.survey.dto.res.QuestionResponse;
 import com.kangaroo.sparring.domain.survey.dto.res.SurveyAnswersResponse;
 import com.kangaroo.sparring.domain.survey.dto.res.SurveyQuestionsResponse;
 import com.kangaroo.sparring.domain.survey.dto.res.SurveySubmitResponse;
@@ -11,10 +12,7 @@ import com.kangaroo.sparring.domain.healthprofile.entity.HealthProfile;
 import com.kangaroo.sparring.domain.healthprofile.service.HealthProfileService;
 import com.kangaroo.sparring.domain.healthprofile.support.HealthProfileFieldSupport;
 import com.kangaroo.sparring.domain.healthprofile.repository.HealthProfileRepository;
-import com.kangaroo.sparring.domain.survey.entity.Answer;
-import com.kangaroo.sparring.domain.survey.entity.Question;
-import com.kangaroo.sparring.domain.survey.entity.Survey;
-import com.kangaroo.sparring.domain.survey.entity.SurveyType;
+import com.kangaroo.sparring.domain.survey.entity.*;
 import com.kangaroo.sparring.domain.survey.repository.AnswerRepository;
 import com.kangaroo.sparring.domain.survey.repository.QuestionRepository;
 import com.kangaroo.sparring.domain.survey.repository.SurveyRepository;
@@ -50,12 +48,23 @@ public class SurveyService {
     /**
      * 설문 문항 조회
      */
-    public SurveyQuestionsResponse getSurveyQuestions(SurveyType surveyType) {
-        Survey survey = surveyRepository.findBySurveyType(surveyType)
+    public SurveyQuestionsResponse getSurveyQuestions() {
+        Survey survey = surveyRepository.findBySurveyType(SurveyType.SURVEY)
                 .orElseThrow(() -> new CustomException(ErrorCode.SURVEY_NOT_FOUND));
-        surveyAnswerValidator.validateHealthProfileFieldMappings(survey.getQuestions());
+        List<Question> questions = questionRepository.findBySurveyTypeAndQuestionStage(
+                SurveyType.SURVEY, QuestionStage.DETAILED
+        );
+        surveyAnswerValidator.validateHealthProfileFieldMappings(questions);
 
-        return SurveyQuestionsResponse.from(survey);
+        List<QuestionResponse> responses = questions.stream()
+                .sorted((a, b) -> Integer.compare(
+                        a.getQuestionOrder() == null ? Integer.MAX_VALUE : a.getQuestionOrder(),
+                        b.getQuestionOrder() == null ? Integer.MAX_VALUE : b.getQuestionOrder()
+                ))
+                .map(QuestionResponse::from)
+                .collect(Collectors.toList());
+
+        return SurveyQuestionsResponse.from(responses);
     }
 
     /**
@@ -64,15 +73,17 @@ public class SurveyService {
     @Transactional
     public SurveySubmitResponse submitSurvey(Long userId, SurveySubmitRequest request) {
         // 이미 완료한 설문인지 확인
-        if (answerRepository.existsByUserIdAndSurveyType(userId, request.getSurveyType())) {
+        if (answerRepository.existsByUserIdAndSurveyTypeAndQuestionStage(userId, SurveyType.SURVEY, QuestionStage.DETAILED)) {
             throw new CustomException(ErrorCode.SURVEY_ALREADY_COMPLETED);
         }
 
         // Survey 존재 여부 확인
-        surveyRepository.findBySurveyType(request.getSurveyType())
+        surveyRepository.findBySurveyType(SurveyType.SURVEY)
                 .orElseThrow(() -> new CustomException(ErrorCode.SURVEY_NOT_FOUND));
 
-        List<Question> questions = questionRepository.findBySurveyType(request.getSurveyType());
+        List<Question> questions = questionRepository.findBySurveyTypeAndQuestionStage(
+                SurveyType.SURVEY, QuestionStage.DETAILED
+        );
         surveyAnswerValidator.validateHealthProfileFieldMappings(questions);
 
         Map<String, Question> questionMap = questions.stream()
@@ -102,9 +113,9 @@ public class SurveyService {
         }
 
         // HealthProfile 생성 또는 업데이트
-        updateHealthProfile(userId, request.getSurveyType(), answers);
+        updateHealthProfile(userId, SurveyType.SURVEY, answers);
 
-        return SurveySubmitResponse.of(request.getSurveyType());
+        return SurveySubmitResponse.of();
     }
 
     /**
@@ -113,7 +124,11 @@ public class SurveyService {
     @Transactional
     public AnswerResponse updateAnswer(Long userId, UpdateAnswerRequest request) {
         Question question = questionRepository
-                .findByQuestionKeyAndSurveyType(request.getQuestionKey(), request.getSurveyType())
+                .findByQuestionKeyAndSurveyTypeAndQuestionStage(
+                        request.getQuestionKey(),
+                        SurveyType.SURVEY,
+                        QuestionStage.DETAILED
+                )
                 .orElseThrow(() -> new CustomException(ErrorCode.QUESTION_NOT_FOUND));
 
         Answer answer = answerRepository.findByUserIdAndQuestionId(userId, question.getId())
@@ -130,8 +145,10 @@ public class SurveyService {
     /**
      * 설문 응답 조회
      */
-    public SurveyAnswersResponse getSurveyAnswers(Long userId, SurveyType surveyType) {
-        List<Answer> answers = answerRepository.findByUserIdAndSurveyType(userId, surveyType);
+    public SurveyAnswersResponse getSurveyAnswers(Long userId) {
+        List<Answer> answers = answerRepository.findByUserIdAndSurveyTypeAndQuestionStage(
+                userId, SurveyType.SURVEY, QuestionStage.DETAILED
+        );
 
         if (answers.isEmpty()) {
             throw new CustomException(ErrorCode.SURVEY_NOT_COMPLETED);
@@ -141,14 +158,16 @@ public class SurveyService {
                 .map(AnswerResponse::from)
                 .collect(Collectors.toList());
 
-        return SurveyAnswersResponse.of(surveyType, answerResponses);
+        return SurveyAnswersResponse.of(answerResponses);
     }
 
     /**
      * 설문 완료 여부 확인
      */
-    public Boolean checkSurveyCompleted(Long userId, SurveyType surveyType) {
-        return answerRepository.existsByUserIdAndSurveyType(userId, surveyType);
+    public Boolean checkSurveyCompleted(Long userId) {
+        return answerRepository.existsByUserIdAndSurveyTypeAndQuestionStage(
+                userId, SurveyType.SURVEY, QuestionStage.DETAILED
+        );
     }
 
     /**
@@ -158,7 +177,7 @@ public class SurveyService {
         HealthProfile healthProfile = healthProfileService.getOrCreateHealthProfile(userId);
 
         // 설문 타입에 따라 HealthProfile 업데이트
-        if (surveyType == SurveyType.BASIC || surveyType == SurveyType.DETAILED) {
+        if (surveyType == SurveyType.SURVEY) {
             applyHealthProfileUpdates(healthProfile, answers);
         }
 

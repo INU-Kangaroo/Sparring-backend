@@ -4,6 +4,7 @@ import com.kangaroo.sparring.domain.healthprofile.entity.HealthProfile;
 import com.kangaroo.sparring.domain.healthprofile.repository.HealthProfileRepository;
 import com.kangaroo.sparring.domain.user.dto.req.LoginRequest;
 import com.kangaroo.sparring.domain.user.dto.req.SignupRequest;
+import com.kangaroo.sparring.domain.user.dto.req.SocialSignupCompleteRequest;
 import com.kangaroo.sparring.domain.user.dto.req.UpdateUserProfileRequest;
 import com.kangaroo.sparring.domain.user.dto.res.AuthResponse;
 import com.kangaroo.sparring.domain.user.dto.res.UserProfileResponse;
@@ -44,12 +45,36 @@ public class UserService {
 
         validateDuplicateEmail(request.getEmail());
         User user = userRepository.save(createUser(request));
-        createHealthProfileIfMissing(user);
+        HealthProfile profile = getOrCreateHealthProfile(user);
+        applySignupProfile(user, profile, request);
 
         // 인증 플래그 삭제
         emailService.deleteVerifiedFlag(request.getEmail());
 
         log.info("회원가입 성공: userId={}, email={}", user.getId(), user.getEmail());
+    }
+
+    @Transactional
+    public void completeSocialSignup(Long userId, SocialSignupCompleteRequest request) {
+        User user = getUserOrThrow(userId);
+        HealthProfile profile = getOrCreateHealthProfile(user);
+
+        user.updateBirthDate(request.getBirthDate());
+        user.updateGender(request.getGender());
+
+        profile.updateProfile(
+                request.getBirthDate(),
+                request.getGender(),
+                request.getHeight(),
+                request.getWeight(),
+                request.getBloodSugarStatus(),
+                request.getBloodPressureStatus(),
+                request.getHasFamilyHypertension(),
+                request.getMedications(),
+                request.getAllergies(),
+                request.getHealthGoal()
+        );
+        healthProfileRepository.save(profile);
     }
 
     // 이메일 중복 체크
@@ -68,14 +93,23 @@ public class UserService {
                 .build();
     }
 
-    private void createHealthProfileIfMissing(User user) {
-        if (healthProfileRepository.existsByUserId(user.getId())) {
-            return;
-        }
-        HealthProfile healthProfile = HealthProfile.builder()
-                .user(user)
-                .build();
-        healthProfileRepository.save(healthProfile);
+    private void applySignupProfile(User user, HealthProfile profile, SignupRequest request) {
+        user.updateBirthDate(request.getBirthDate());
+        user.updateGender(request.getGender());
+
+        profile.updateProfile(
+                request.getBirthDate(),
+                request.getGender(),
+                request.getHeight(),
+                request.getWeight(),
+                request.getBloodSugarStatus(),
+                request.getBloodPressureStatus(),
+                request.getHasFamilyHypertension(),
+                request.getMedications(),
+                request.getAllergies(),
+                request.getHealthGoal()
+        );
+        healthProfileRepository.save(profile);
     }
 
     private AuthResponse generateAuthResponse(User user) {

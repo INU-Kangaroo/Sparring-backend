@@ -14,26 +14,17 @@ import lombok.NoArgsConstructor;
 @Schema(description = "설문 응답 항목")
 public class AnswerResponse {
 
-    @Schema(description = "응답 ID")
-    private Long answerId;
-    @Schema(description = "질문 ID")
-    private Long questionId;
     @Schema(
-            description = "질문 키 (규칙: {SURVEY_TYPE}_{FIELD})",
-            example = "BASIC_HEIGHT"
+            description = "질문 키 (예: HEIGHT, MEAL_FREQUENCY 등)",
+            example = "HEIGHT"
     )
     private String questionKey;
-    @Schema(description = "질문 내용")
-    private String questionText;
     @Schema(description = "응답 값")
     private String value;
 
     public static AnswerResponse from(Answer answer) {
         return AnswerResponse.builder()
-                .answerId(answer.getId())
-                .questionId(answer.getQuestion().getId())
                 .questionKey(answer.getQuestion().getQuestionKey())
-                .questionText(answer.getQuestion().getQuestionText())
                 .value(answer.getAnswerText())
                 .build();
     }

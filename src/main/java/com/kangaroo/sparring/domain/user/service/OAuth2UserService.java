@@ -30,7 +30,7 @@ public class OAuth2UserService {
         }
 
         SocialProvider provider = convertToSocialProvider(userInfo.getProvider());
-        
+
         return userRepository.findByEmail(userInfo.getEmail())
                 .map(existingUser -> {
                     if (existingUser.getProvider() == null || existingUser.getProvider() != provider) {

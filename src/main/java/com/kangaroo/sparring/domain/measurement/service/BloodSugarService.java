@@ -1,9 +1,9 @@
 package com.kangaroo.sparring.domain.measurement.service;
 
-import com.kangaroo.sparring.domain.measurement.dto.request.BloodSugarLogCreateRequest;
-import com.kangaroo.sparring.domain.measurement.dto.response.BloodSugarLogResponse;
-import com.kangaroo.sparring.domain.measurement.dto.response.BloodSugarPredictionResponse;
-import com.kangaroo.sparring.domain.measurement.dto.response.MonthlyBloodSugarResponse;
+import com.kangaroo.sparring.domain.measurement.dto.req.BloodSugarLogCreateRequest;
+import com.kangaroo.sparring.domain.measurement.dto.res.BloodSugarLogResponse;
+import com.kangaroo.sparring.domain.measurement.dto.res.BloodSugarPredictionResponse;
+import com.kangaroo.sparring.domain.measurement.dto.res.MonthlyBloodSugarResponse;
 import com.kangaroo.sparring.domain.measurement.entity.BloodSugarLog;
 import com.kangaroo.sparring.domain.measurement.entity.BloodSugarPrediction;
 import com.kangaroo.sparring.domain.measurement.repository.BloodSugarLogRepository;
@@ -58,8 +58,7 @@ public class BloodSugarService {
         BloodSugarLog savedLog = bloodSugarLogRepository.save(bloodSugarLog);
         log.info("혈당 측정 기록 등록 완료: logId={}", savedLog.getId());
 
-        // TODO: AI 서버에 예측 요청
-        // requestPrediction(userId);
+        // AI 예측 연동 전까지는 예측 요청 생략
 
         return BloodSugarLogResponse.from(savedLog);
     }

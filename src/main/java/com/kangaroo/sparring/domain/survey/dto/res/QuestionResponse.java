@@ -24,19 +24,15 @@ public class QuestionResponse {
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
-    @Schema(description = "질문 ID")
-    private Long id;
     @Schema(
-            description = "질문 키 (규칙: {SURVEY_TYPE}_{FIELD})",
-            example = "BASIC_HEIGHT"
+            description = "질문 키 (예: HEIGHT, MEAL_FREQUENCY 등)",
+            example = "HEIGHT"
     )
     private String questionKey;
     @Schema(description = "질문 타입", example = "NUMBER")
     private QuestionType questionType;
     @Schema(description = "질문 내용")
     private String questionText;
-    @Schema(description = "질문 순서", example = "1")
-    private Integer questionOrder;
     @Schema(description = "필수 여부", example = "true")
     private Boolean isRequired;
     @Schema(description = "선택지")
@@ -44,11 +40,9 @@ public class QuestionResponse {
 
     public static QuestionResponse from(Question question) {
         return QuestionResponse.builder()
-                .id(question.getId())
                 .questionKey(question.getQuestionKey())
                 .questionType(question.getQuestionType())
                 .questionText(question.getQuestionText())
-                .questionOrder(question.getQuestionOrder())
                 .isRequired(question.getIsRequired())
                 .options(parseOptions(question.getOptions(), question.getQuestionKey()))
                 .build();

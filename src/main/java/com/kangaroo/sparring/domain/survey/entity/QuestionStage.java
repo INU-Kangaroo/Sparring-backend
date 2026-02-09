@@ -5,8 +5,9 @@ import lombok.RequiredArgsConstructor;
 
 @Getter
 @RequiredArgsConstructor
-public enum SurveyType {
-    SURVEY("설문");
+public enum QuestionStage {
+    BASIC("회원가입"),
+    DETAILED("설문");
 
     private final String description;
 }

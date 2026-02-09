@@ -9,7 +9,7 @@ import java.util.List;
 
 @Entity
 @Table(name = "questions",
-        uniqueConstraints = @UniqueConstraint(columnNames = {"survey_id", "question_key"}))
+        uniqueConstraints = @UniqueConstraint(columnNames = {"survey_id", "question_key", "question_stage"}))
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor
@@ -26,6 +26,10 @@ public class Question extends BaseEntity {
 
     @Column(name = "question_key", nullable = false, length = 100)
     private String questionKey;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "question_stage", nullable = false, length = 20)
+    private QuestionStage questionStage;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "question_type", nullable = false, length = 20)

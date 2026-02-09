@@ -21,7 +21,7 @@ public class GlobalExceptionHandler {
         ErrorCode errorCode = e.getErrorCode();
         return ResponseEntity
                 .status(errorCode.getStatus())
-                .body(new ErrorResponse(errorCode.getCode(), errorCode.getMessage(), null));
+                .body(new ErrorResponse(errorCode.getCode(), e.getMessage(), null));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

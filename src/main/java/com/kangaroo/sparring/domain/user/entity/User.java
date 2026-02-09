@@ -82,6 +82,12 @@ public class User extends BaseEntity {
         }
     }
 
+    public void updateGender(Gender gender) {
+        if (gender != null) {
+            this.gender = gender;
+        }
+    }
+
     public void updatePassword(String encodedPassword) {
         if (encodedPassword != null && !encodedPassword.isBlank()) {
             this.password = encodedPassword;

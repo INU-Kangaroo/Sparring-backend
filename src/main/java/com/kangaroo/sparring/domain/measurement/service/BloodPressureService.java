@@ -1,9 +1,9 @@
 package com.kangaroo.sparring.domain.measurement.service;
 
-import com.kangaroo.sparring.domain.measurement.dto.request.BloodPressureLogCreateRequest;
-import com.kangaroo.sparring.domain.measurement.dto.response.BloodPressureLogResponse;
-import com.kangaroo.sparring.domain.measurement.dto.response.BloodPressurePredictionResponse;
-import com.kangaroo.sparring.domain.measurement.dto.response.MonthlyBloodPressureResponse;
+import com.kangaroo.sparring.domain.measurement.dto.req.BloodPressureLogCreateRequest;
+import com.kangaroo.sparring.domain.measurement.dto.res.BloodPressureLogResponse;
+import com.kangaroo.sparring.domain.measurement.dto.res.BloodPressurePredictionResponse;
+import com.kangaroo.sparring.domain.measurement.dto.res.MonthlyBloodPressureResponse;
 import com.kangaroo.sparring.domain.measurement.entity.BloodPressureLog;
 import com.kangaroo.sparring.domain.measurement.entity.BloodPressurePrediction;
 import com.kangaroo.sparring.domain.measurement.repository.BloodPressureLogRepository;
@@ -62,8 +62,7 @@ public class BloodPressureService {
         BloodPressureLog savedLog = bloodPressureLogRepository.save(bloodPressureLog);
         log.info("혈압 측정 기록 등록 완료: logId={}", savedLog.getId());
 
-        // TODO: AI 서버에 예측 요청
-        // requestPrediction(userId);
+        // AI 예측 연동 전까지는 예측 요청 생략
 
         return BloodPressureLogResponse.from(savedLog);
     }

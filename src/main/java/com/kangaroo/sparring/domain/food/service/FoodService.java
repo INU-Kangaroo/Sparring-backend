@@ -45,7 +45,7 @@ public class FoodService {
 
         if (foods.isEmpty()) {
             log.info("DB에 음식 없음, 외부 API 호출 필요: keyword={}", normalizedKeyword);
-            // TODO: 외부 API 호출 및 DB 저장
+            // 외부 API 연동 전까지는 DB 결과만 반환
             // foods = externalFoodApiClient.searchAndCache(normalizedKeyword);
         }
 

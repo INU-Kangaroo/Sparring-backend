@@ -20,6 +20,8 @@ public enum ErrorCode {
     INVALID_TOKEN(HttpStatus.UNAUTHORIZED, "A001", "유효하지 않은 토큰입니다"),
     EXPIRED_TOKEN(HttpStatus.UNAUTHORIZED, "A002", "만료된 토큰입니다"),
     UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "A003", "인증이 필요합니다"),
+    OAUTH2_EMAIL_REQUIRED(HttpStatus.BAD_REQUEST, "A004", "소셜 로그인에는 이메일 동의가 필요합니다"),
+    OAUTH2_PROVIDER_MISMATCH(HttpStatus.CONFLICT, "A005", "다른 소셜 계정으로 가입된 이메일입니다"),
 
     // Email Verification
     EMAIL_NOT_VERIFIED(HttpStatus.FORBIDDEN, "E001", "이메일 인증이 필요합니다"),

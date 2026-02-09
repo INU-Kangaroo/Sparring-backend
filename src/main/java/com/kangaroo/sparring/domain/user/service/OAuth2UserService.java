@@ -3,6 +3,8 @@ package com.kangaroo.sparring.domain.user.service;
 import com.kangaroo.sparring.domain.user.type.SocialProvider;
 import com.kangaroo.sparring.domain.user.entity.User;
 import com.kangaroo.sparring.domain.user.repository.UserRepository;
+import com.kangaroo.sparring.global.exception.CustomException;
+import com.kangaroo.sparring.global.exception.ErrorCode;
 import com.kangaroo.sparring.global.security.oauth2.user.OAuth2UserInfo;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -23,10 +25,19 @@ public class OAuth2UserService {
     public User processOAuth2User(OAuth2UserInfo userInfo) {
         log.info("Processing OAuth2 user - Provider: {}, Email: {}", userInfo.getProvider(), userInfo.getEmail());
 
+        if (userInfo.getEmail() == null || userInfo.getEmail().isBlank()) {
+            throw new CustomException(ErrorCode.OAUTH2_EMAIL_REQUIRED);
+        }
+
         SocialProvider provider = convertToSocialProvider(userInfo.getProvider());
         
         return userRepository.findByEmail(userInfo.getEmail())
-                .map(existingUser -> updateOAuth2User(existingUser, userInfo, provider))
+                .map(existingUser -> {
+                    if (existingUser.getProvider() == null || existingUser.getProvider() != provider) {
+                        throw new CustomException(ErrorCode.OAUTH2_PROVIDER_MISMATCH);
+                    }
+                    return updateOAuth2User(existingUser, userInfo, provider);
+                })
                 .orElseGet(() -> createOAuth2User(userInfo, provider));
     }
 

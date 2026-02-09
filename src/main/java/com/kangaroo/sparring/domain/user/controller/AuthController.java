@@ -2,6 +2,7 @@ package com.kangaroo.sparring.domain.user.controller;
 
 import com.kangaroo.sparring.domain.user.dto.req.EmailRequest;
 import com.kangaroo.sparring.domain.user.dto.req.LoginRequest;
+import com.kangaroo.sparring.domain.user.dto.req.OAuth2CodeRequest;
 import com.kangaroo.sparring.domain.user.dto.req.SignupRequest;
 import com.kangaroo.sparring.domain.user.dto.req.VerifyCodeRequest;
 import com.kangaroo.sparring.domain.user.dto.res.AuthResponse;
@@ -12,6 +13,7 @@ import com.kangaroo.sparring.global.email.EmailVerificationResult;
 import com.kangaroo.sparring.global.exception.CustomException;
 import com.kangaroo.sparring.global.exception.ErrorCode;
 import com.kangaroo.sparring.global.security.principal.UserIdPrincipal;
+import com.kangaroo.sparring.global.security.oauth2.service.OAuth2CodeAuthService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
@@ -32,6 +34,7 @@ public class AuthController {
 
     private final UserService userService;
     private final EmailService emailService;
+    private final OAuth2CodeAuthService oAuth2CodeAuthService;
 
     /**
      * 이메일 인증코드 발송
@@ -134,6 +137,41 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
         AuthResponse response = userService.login(request);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * SDK 로그인 + Authorization Code 교환
+     */
+    @Operation(summary = "OAuth2 코드 로그인", description = "SDK 로그인으로 받은 authorization code를 JWT로 교환")
+    @ApiResponses({
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "OK",
+                    content = @Content(
+                            mediaType = "application/json",
+                            examples = @ExampleObject(
+                                    name = "Success",
+                                    value = """
+                                            {
+                                              "userId": 1,
+                                              "email": "test@example.com",
+                                              "username": "홍길동",
+                                              "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+                                              "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+                                              "tokenType": "Bearer"
+                                            }
+                                            """
+                            )
+                    )
+            )
+    })
+    @PostMapping("/oauth2/{provider}")
+    public ResponseEntity<AuthResponse> oauth2Login(
+            @PathVariable String provider,
+            @Valid @RequestBody OAuth2CodeRequest request
+    ) {
+        AuthResponse response = oAuth2CodeAuthService.loginWithAuthorizationCode(provider, request);
         return ResponseEntity.ok(response);
     }
 

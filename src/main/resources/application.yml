@@ -36,48 +36,31 @@ spring:
     time-zone: Asia/Seoul
 
   # OAuth2 Configuration
-  security:
-    oauth2:
-      client:
-        registration:
-          google:
-            client-id: ${GOOGLE_CLIENT_ID}
-            client-secret: ${GOOGLE_CLIENT_SECRET}
-            scope:
-              - profile
-              - email
-            redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
-            authorization-grant-type: authorization_code
-            client-name: Google
-
-          kakao:
-            client-id: ${KAKAO_CLIENT_ID}
-            client-secret: ${KAKAO_CLIENT_SECRET}
-            scope:
-              - profile_nickname
-              - profile_image
-              - account_email
-              - gender
-              - age_range
-              - birthday
-              - birthyear
-            redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
-            authorization-grant-type: authorization_code
-            client-authentication-method: client_secret_post
-            client-name: Kakao
-
-        provider:
-          google:
-            authorization-uri: https://accounts.google.com/o/oauth2/v2/auth
-            token-uri: https://oauth2.googleapis.com/token
-            user-info-uri: https://www.googleapis.com/oauth2/v3/userinfo
-            user-name-attribute: sub
-
-          kakao:
-            authorization-uri: https://kauth.kakao.com/oauth/authorize
-            token-uri: https://kauth.kakao.com/oauth/token
-            user-info-uri: https://kapi.kakao.com/v2/user/me
-            user-name-attribute: id
+  oauth2:
+    google:
+      client-id: ${GOOGLE_CLIENT_ID}
+      client-secret: ${GOOGLE_CLIENT_SECRET}
+      token-uri: https://oauth2.googleapis.com/token
+      user-info-uri: https://www.googleapis.com/oauth2/v3/userinfo
+      token-info-uri: https://oauth2.googleapis.com/tokeninfo
+      user-name-attribute: sub
+      scope:
+        - profile
+        - email
+    kakao:
+      client-id: ${KAKAO_CLIENT_ID}
+      token-uri: https://kauth.kakao.com/oauth/token
+      user-info-uri: https://kapi.kakao.com/v2/user/me
+      access-token-info-uri: https://kapi.kakao.com/v1/user/access_token_info
+      app-id: ${KAKAO_APP_ID}
+      scope:
+        - profile_nickname
+        - profile_image
+        - account_email
+        - gender
+        - age_range
+        - birthday
+        - birthyear
 
   # Mail Configuration
   mail:
@@ -101,11 +84,6 @@ jwt:
   secret: ${JWT_SECRET}
   access-token-validity: 3600000    # 1시간
   refresh-token-validity: 604800000 # 7일
-
-# OAuth2 Configuration
-oauth2:
-  redirect:
-    success-url: ${OAUTH2_SUCCESS_REDIRECT_URL}
 
 # Logging Configuration
 logging:

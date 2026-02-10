@@ -23,6 +23,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.YearMonth;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -33,6 +34,8 @@ import java.util.stream.Collectors;
 @Transactional(readOnly = true)
 @Slf4j
 public class BloodSugarService {
+
+    private static final ZoneId KOREA_ZONE = ZoneId.of("Asia/Seoul");
 
     private final BloodSugarLogRepository bloodSugarLogRepository;
     private final BloodSugarPredictionRepository bloodSugarPredictionRepository;
@@ -217,7 +220,7 @@ public class BloodSugarService {
      * 측정 시간 검증
      */
     private void validateMeasurementTime(LocalDateTime measurementTime) {
-        if (measurementTime.isAfter(LocalDateTime.now())) {
+        if (measurementTime.isAfter(LocalDateTime.now(KOREA_ZONE))) {
             throw new CustomException(ErrorCode.MEASUREMENT_TIME_FUTURE);
         }
     }

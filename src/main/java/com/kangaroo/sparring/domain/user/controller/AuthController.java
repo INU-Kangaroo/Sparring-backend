@@ -258,12 +258,8 @@ public class AuthController {
     @PostMapping("/refresh")
     @Operation(summary = "토큰 갱신", description = "리프레시 토큰으로 액세스 토큰 재발급")
     public ResponseEntity<AuthResponse> refreshToken(
-            @RequestHeader("Authorization") String refreshToken) {
-
-        // "Bearer " 제거
-        if (refreshToken.startsWith("Bearer ")) {
-            refreshToken = refreshToken.substring(7);
-        }
+            @Parameter(description = "리프레시 토큰", required = true)
+            @RequestHeader("X-Refresh-Token") String refreshToken) {
 
         AuthResponse response = userService.refreshAccessToken(refreshToken);
         return ResponseEntity.ok(response);

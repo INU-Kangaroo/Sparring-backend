@@ -8,6 +8,7 @@ import com.kangaroo.sparring.domain.measurement.entity.BloodPressureLog;
 import com.kangaroo.sparring.domain.measurement.entity.BloodPressurePrediction;
 import com.kangaroo.sparring.domain.measurement.repository.BloodPressureLogRepository;
 import com.kangaroo.sparring.domain.measurement.repository.BloodPressurePredictionRepository;
+import com.kangaroo.sparring.domain.measurement.support.MeasurementValidationSupport;
 import com.kangaroo.sparring.domain.user.entity.User;
 import com.kangaroo.sparring.domain.user.repository.UserRepository;
 import com.kangaroo.sparring.global.exception.CustomException;
@@ -23,7 +24,6 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.YearMonth;
-import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -34,8 +34,6 @@ import java.util.stream.Collectors;
 @Transactional(readOnly = true)
 @Slf4j
 public class BloodPressureService {
-
-    private static final ZoneId KOREA_ZONE = ZoneId.of("Asia/Seoul");
 
     private final BloodPressureLogRepository bloodPressureLogRepository;
     private final BloodPressurePredictionRepository bloodPressurePredictionRepository;
@@ -54,7 +52,7 @@ public class BloodPressureService {
                 request.getMeasurementDate(),
                 request.getMeasurementTime()
         );
-        validateMeasurementTime(measuredAt);
+        MeasurementValidationSupport.validateMeasurementTime(measuredAt);
 
         BloodPressureLog bloodPressureLog = BloodPressureLog.create(
                 user,
@@ -78,7 +76,7 @@ public class BloodPressureService {
                                                                LocalDateTime endDate) {
         log.info("혈압 측정 기록 조회: userId={}, startDate={}, endDate={}", userId, startDate, endDate);
 
-        validateDateRange(startDate, endDate);
+        MeasurementValidationSupport.validateDateRange(startDate, endDate);
 
         List<BloodPressureLog> logs = bloodPressureLogRepository.findByUserIdAndDateRange(
                 userId, startDate, endDate);
@@ -91,7 +89,7 @@ public class BloodPressureService {
     public List<BloodPressureLogResponse> getBloodPressureLogsByMonth(Long userId, int year, int month) {
         log.info("월별 혈압 측정 기록 조회: userId={}, year={}, month={}", userId, year, month);
 
-        validateMonthRange(month);
+        MeasurementValidationSupport.validateMonthRange(month);
 
         YearMonth yearMonth = YearMonth.of(year, month);
         LocalDateTime startDateTime = yearMonth.atDay(1).atStartOfDay();
@@ -115,7 +113,7 @@ public class BloodPressureService {
 
         LocalDateTime startDateTime = date.atStartOfDay();
         LocalDateTime endDateTime = date.atTime(LocalTime.MAX);
-        validateDateRange(startDateTime, endDateTime);
+        MeasurementValidationSupport.validateDateRange(startDateTime, endDateTime);
 
         List<BloodPressureLog> logs = bloodPressureLogRepository
                 .findByUserIdAndMeasuredAtBetweenAndIsDeletedFalseOrderByMeasuredAtAsc(
@@ -138,7 +136,7 @@ public class BloodPressureService {
         LocalDateTime startDateTime = startDate.atStartOfDay();
         LocalDateTime endDateTime = endDate.atTime(LocalTime.MAX);
 
-        validateDateRange(startDateTime, endDateTime);
+        MeasurementValidationSupport.validateDateRange(startDateTime, endDateTime);
 
         List<BloodPressurePrediction> predictions = bloodPressurePredictionRepository
                 .findByUserIdAndTargetDatetimeBetweenAndIsDeletedFalseOrderByTargetDatetimeAsc(
@@ -156,9 +154,7 @@ public class BloodPressureService {
     public List<MonthlyBloodPressureResponse> getMonthlyStatistics(Long userId, int year) {
         log.info("월별 혈압 집계 조회: userId={}, year={}", userId, year);
 
-        if (year < 1900 || year > 2100) {
-            throw new CustomException(ErrorCode.INVALID_DATE_RANGE);
-        }
+        MeasurementValidationSupport.validateYearRange(year);
 
         LocalDateTime startDateTime = LocalDate.of(year, 1, 1).atStartOfDay();
         LocalDateTime endDateTime = LocalDate.of(year, 12, 31).atTime(LocalTime.MAX);
@@ -243,33 +239,6 @@ public class BloodPressureService {
         // 심박수 범위 검증 (optional이므로 null 체크)
         if (heartRate != null && (heartRate < 30 || heartRate > 250)) {
             throw new CustomException(ErrorCode.INVALID_HEART_RATE);
-        }
-    }
-
-    /**
-     * 측정 시간 검증
-     */
-    private void validateMeasurementTime(LocalDateTime measurementTime) {
-        if (measurementTime.isAfter(LocalDateTime.now(KOREA_ZONE))) {
-            throw new CustomException(ErrorCode.MEASUREMENT_TIME_FUTURE);
-        }
-    }
-
-    /**
-     * 날짜 범위 검증
-     */
-    private void validateDateRange(LocalDateTime startDate, LocalDateTime endDate) {
-        if (startDate.isAfter(endDate)) {
-            throw new CustomException(ErrorCode.INVALID_DATE_RANGE);
-        }
-    }
-
-    /**
-     * 월 유효성 검증
-     */
-    private void validateMonthRange(int month) {
-        if (month < 1 || month > 12) {
-            throw new CustomException(ErrorCode.INVALID_DATE_RANGE);
         }
     }
 

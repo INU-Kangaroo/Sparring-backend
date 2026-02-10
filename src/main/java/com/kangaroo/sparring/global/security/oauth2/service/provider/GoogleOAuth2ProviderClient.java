@@ -47,7 +47,13 @@ public class GoogleOAuth2ProviderClient implements OAuth2ProviderClient {
     @Override
     public String resolveAccessToken(OAuth2CodeRequest request) {
         if (request.getCode() == null || request.getCode().isBlank()) {
-            throw new CustomException(ErrorCode.INVALID_INPUT);
+            throw new CustomException(ErrorCode.INVALID_INPUT, "code는 필수입니다.");
+        }
+        if (request.getRedirectUri() == null || request.getRedirectUri().isBlank()) {
+            throw new CustomException(ErrorCode.OAUTH2_MISSING_REDIRECT_URI);
+        }
+        if (request.getCodeVerifier() == null || request.getCodeVerifier().isBlank()) {
+            throw new CustomException(ErrorCode.OAUTH2_MISSING_CODE_VERIFIER);
         }
 
         Map<String, Object> tokenResponse = exchangeAuthorizationCode(request);
@@ -87,6 +93,8 @@ public class GoogleOAuth2ProviderClient implements OAuth2ProviderClient {
         params.add("grant_type", "authorization_code");
         params.add("code", request.getCode());
         params.add("client_id", googleClientId);
+        params.add("redirect_uri", request.getRedirectUri());
+        params.add("code_verifier", request.getCodeVerifier());
         if (googleClientSecret != null && !googleClientSecret.isBlank()) {
             params.add("client_secret", googleClientSecret);
         }

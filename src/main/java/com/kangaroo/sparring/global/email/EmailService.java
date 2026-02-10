@@ -14,7 +14,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
-import java.util.Random;
+import java.security.SecureRandom;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
@@ -37,6 +37,7 @@ public class EmailService {
     private static final int VERIFIED_EXPIRATION_MINUTES = 30;
     private static final String RESEND_COOLDOWN_PREFIX = "email:cooldown:";
     private static final int RESEND_COOLDOWN_SECONDS = 60; // 1분
+    private static final SecureRandom CODE_RANDOM = new SecureRandom();
 
     /**
      * 이메일 인증코드 발송
@@ -217,8 +218,7 @@ public class EmailService {
      * 6자리 랜덤 코드 생성
      */
     private String generateRandomCode() {
-        Random random = new Random();
-        return String.format("%06d", random.nextInt(1000000));
+        return String.format("%06d", CODE_RANDOM.nextInt(1_000_000));
     }
 
     /**

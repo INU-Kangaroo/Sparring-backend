@@ -96,6 +96,26 @@ public class BloodSugarService {
                 .collect(Collectors.toList());
     }
 
+    public List<BloodSugarLogResponse> getBloodSugarLogsByDate(Long userId, LocalDate date) {
+        log.info("일별 혈당 측정 기록 조회: userId={}, date={}", userId, date);
+
+        if (date == null) {
+            throw new CustomException(ErrorCode.INVALID_DATE_RANGE);
+        }
+
+        LocalDateTime startDateTime = date.atStartOfDay();
+        LocalDateTime endDateTime = date.atTime(LocalTime.MAX);
+        validateDateRange(startDateTime, endDateTime);
+
+        List<BloodSugarLog> logs = bloodSugarLogRepository
+                .findByUserIdAndMeasurementTimeBetweenAndIsDeletedFalseOrderByMeasurementTimeAsc(
+                        userId, startDateTime, endDateTime);
+
+        return logs.stream()
+                .map(BloodSugarLogResponse::from)
+                .collect(Collectors.toList());
+    }
+
     public List<BloodSugarPredictionResponse> getBloodSugarPredictions(Long userId,
                                                                        LocalDate startDate,
                                                                        LocalDate endDate) {

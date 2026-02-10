@@ -54,6 +54,7 @@ public class HealthProfileService {
         return HealthProfileResponse.from(updatedProfile);
     }
 
+    @Transactional
     public HealthProfile getOrCreateHealthProfile(Long userId) {
         return healthProfileRepository.findByUserId(userId)
                 .orElseGet(() -> {

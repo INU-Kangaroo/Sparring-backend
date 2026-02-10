@@ -215,6 +215,32 @@ public class AuthController {
             )
     })
     @PostMapping("/oauth2/{provider}")
+    @io.swagger.v3.oas.annotations.parameters.RequestBody(
+            required = true,
+            content = @Content(
+                    mediaType = "application/json",
+                    examples = {
+                            @ExampleObject(
+                                    name = "Google (Authorization Code + PKCE)",
+                                    value = """
+                                            {
+                                              "code": "4/0AfJohXk...",
+                                              "redirectUri": "com.example.app:/oauth2redirect",
+                                              "codeVerifier": "hJtX...sK9"
+                                            }
+                                            """
+                            ),
+                            @ExampleObject(
+                                    name = "Kakao (SDK Access Token)",
+                                    value = """
+                                            {
+                                              "accessToken": "eyJhbGciOi..."
+                                            }
+                                            """
+                            )
+                    }
+            )
+    )
     public ResponseEntity<AuthResponse> oauth2Login(
             @PathVariable String provider,
             @Valid @RequestBody OAuth2CodeRequest request

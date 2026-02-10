@@ -1,7 +1,6 @@
 package com.kangaroo.sparring.domain.measurement.entity;
 
 import com.kangaroo.sparring.domain.common.BaseEntity;
-import com.kangaroo.sparring.domain.measurement.type.BloodSugarMeasurementType;
 import com.kangaroo.sparring.domain.user.entity.User;
 import jakarta.persistence.*;
 import lombok.*;
@@ -33,33 +32,20 @@ public class BloodSugarLog extends BaseEntity {
     @Column(name = "measurement_time", nullable = false)
     private LocalDateTime measurementTime;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "measurement_type", nullable = false, length = 20)
-    private BloodSugarMeasurementType measurementType;
-
-    @Column(name = "note", length = 500)
-    private String note;
+    @Column(name = "measurement_label", nullable = false, length = 50)
+    private String measurementLabel;
 
     /**
      * 혈당 측정 기록 생성
      */
     public static BloodSugarLog create(User user, Integer glucoseLevel,
                                        LocalDateTime measurementTime,
-                                       BloodSugarMeasurementType measurementType,
-                                       String note) {
+                                       String measurementLabel) {
         return BloodSugarLog.builder()
                 .user(user)
                 .glucoseLevel(glucoseLevel)
                 .measurementTime(measurementTime)
-                .measurementType(measurementType)
-                .note(note)
+                .measurementLabel(measurementLabel)
                 .build();
-    }
-
-    /**
-     * 메모 수정
-     */
-    public void updateNote(String note) {
-        this.note = note;
     }
 }

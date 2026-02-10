@@ -85,6 +85,20 @@ public class BloodPressureController {
         return ResponseEntity.ok(responses);
     }
 
+    @Operation(summary = "혈압 측정 기록 조회 (일)", description = "특정 날짜 혈압 기록 조회")
+    @GetMapping("/logs/daily")
+    public ResponseEntity<List<BloodPressureLogResponse>> getBloodPressureLogsByDate(
+            @AuthenticationPrincipal UserIdPrincipal principal,
+            @Parameter(description = "날짜 (yyyy-MM-dd)", example = "2026-01-28")
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date
+    ) {
+        Long userId = PrincipalResolver.resolveUserId(principal);
+        log.info("일별 혈압 측정 기록 조회 API 호출: userId={}, date={}", userId, date);
+
+        List<BloodPressureLogResponse> responses = bloodPressureService.getBloodPressureLogsByDate(userId, date);
+        return ResponseEntity.ok(responses);
+    }
+
     @Operation(summary = "혈압 예측 조회", description = "특정 기간 혈압 예측 데이터 조회")
     @GetMapping("/predictions")
     public ResponseEntity<List<BloodPressurePredictionResponse>> getBloodPressurePredictions(

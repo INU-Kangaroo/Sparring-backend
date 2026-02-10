@@ -1,7 +1,8 @@
 package com.kangaroo.sparring.domain.measurement.dto.req;
 
-import com.kangaroo.sparring.domain.measurement.type.BloodPressureMeasurementType;
+import com.fasterxml.jackson.annotation.JsonFormat;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
@@ -10,12 +11,13 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDateTime;
+import java.time.LocalDate;
+import java.time.LocalTime;
 
 @Getter
 @NoArgsConstructor
 @AllArgsConstructor
-@Schema(description = "혈압 측정 기록 등록 요청")
+@Schema(description = "혈압 측정 기록 등록 요청 (모든 시간은 KST 기준)")
 public class BloodPressureLogCreateRequest {
 
     @Schema(description = "수축기 혈압 (mmHg)", example = "120", requiredMode = Schema.RequiredMode.REQUIRED)
@@ -35,29 +37,31 @@ public class BloodPressureLogCreateRequest {
     @Max(value = 250, message = "심박수는 250 이하여야 합니다")
     private Integer heartRate;
 
-    @Schema(description = "메모", example = "아침 기상 후 측정")
-    @Size(max = 500, message = "메모는 500자 이내로 입력해주세요")
-    private String note;
 
     @Schema(
-            description = "측정 시간",
-            example = "2026-01-28T08:00:00",
+            description = "측정 날짜 (KST)",
+            example = "2026-01-28",
             requiredMode = Schema.RequiredMode.REQUIRED
     )
+    @NotNull(message = "측정 날짜는 필수입니다")
+    private LocalDate measurementDate;
+
+    @Schema(
+            description = "측정 시간 (KST, HH:mm)",
+            example = "08:00",
+            requiredMode = Schema.RequiredMode.REQUIRED
+    )
+    @JsonFormat(pattern = "HH:mm")
     @NotNull(message = "측정 시간은 필수입니다")
-    private LocalDateTime measuredAt;
+    private LocalTime measurementTime;
 
     @Schema(
-            description = """
-            측정 시점
-            
-            - MORNING: 아침 (기상 후 1시간 이내)
-            - BEDTIME: 취침 전 (잠들기 전)
-            """,
-            example = "MORNING",
-            allowableValues = {"MORNING", "BEDTIME"},
+            description = "측정 라벨 (아침 또는 취침 전)",
+            example = "아침",
+            allowableValues = {"아침", "취침 전"},
             requiredMode = Schema.RequiredMode.REQUIRED
     )
-    @NotNull(message = "측정 시점은 필수입니다")
-    private BloodPressureMeasurementType measurementType;
+    @NotBlank(message = "측정 라벨은 필수입니다")
+    @Size(max = 50, message = "측정 라벨은 50자 이내로 입력해주세요")
+    private String measurementLabel;
 }

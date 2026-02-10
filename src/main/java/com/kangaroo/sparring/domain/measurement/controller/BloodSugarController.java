@@ -85,6 +85,20 @@ public class BloodSugarController {
         return ResponseEntity.ok(responses);
     }
 
+    @Operation(summary = "혈당 측정 기록 조회 (일)", description = "특정 날짜 혈당 기록 조회")
+    @GetMapping("/logs/daily")
+    public ResponseEntity<List<BloodSugarLogResponse>> getBloodSugarLogsByDate(
+            @AuthenticationPrincipal UserIdPrincipal principal,
+            @Parameter(description = "날짜 (yyyy-MM-dd)", example = "2026-01-28")
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date
+    ) {
+        Long userId = PrincipalResolver.resolveUserId(principal);
+        log.info("일별 혈당 측정 기록 조회 API 호출: userId={}, date={}", userId, date);
+
+        List<BloodSugarLogResponse> responses = bloodSugarService.getBloodSugarLogsByDate(userId, date);
+        return ResponseEntity.ok(responses);
+    }
+
     @Operation(summary = "월별 혈당 집계 조회", description = "특정 연도 월별 혈당 통계 조회 (1월~12월)")
     @GetMapping("/logs/monthly-stats")
     public ResponseEntity<List<MonthlyBloodSugarResponse>> getMonthlyBloodSugar(

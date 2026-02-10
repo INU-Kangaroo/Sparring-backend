@@ -45,14 +45,18 @@ public class BloodSugarService {
         User user = findUserById(userId);
 
         validateGlucoseLevel(request.getGlucoseLevel());
-        validateMeasurementTime(request.getMeasurementTime());
+
+        LocalDateTime measurementTime = LocalDateTime.of(
+                request.getMeasurementDate(),
+                request.getMeasurementTime()
+        );
+        validateMeasurementTime(measurementTime);
 
         BloodSugarLog bloodSugarLog = BloodSugarLog.create(
                 user,
                 request.getGlucoseLevel(),
-                request.getMeasurementTime(),
-                request.getMeasurementType(),
-                request.getNote()
+                measurementTime,
+                request.getMeasurementLabel()
         );
 
         BloodSugarLog savedLog = bloodSugarLogRepository.save(bloodSugarLog);
@@ -86,6 +90,26 @@ public class BloodSugarService {
         YearMonth yearMonth = YearMonth.of(year, month);
         LocalDateTime startDateTime = yearMonth.atDay(1).atStartOfDay();
         LocalDateTime endDateTime = yearMonth.atEndOfMonth().atTime(LocalTime.MAX);
+
+        List<BloodSugarLog> logs = bloodSugarLogRepository
+                .findByUserIdAndMeasurementTimeBetweenAndIsDeletedFalseOrderByMeasurementTimeAsc(
+                        userId, startDateTime, endDateTime);
+
+        return logs.stream()
+                .map(BloodSugarLogResponse::from)
+                .collect(Collectors.toList());
+    }
+
+    public List<BloodSugarLogResponse> getBloodSugarLogsByDate(Long userId, LocalDate date) {
+        log.info("일별 혈당 측정 기록 조회: userId={}, date={}", userId, date);
+
+        if (date == null) {
+            throw new CustomException(ErrorCode.INVALID_DATE_RANGE);
+        }
+
+        LocalDateTime startDateTime = date.atStartOfDay();
+        LocalDateTime endDateTime = date.atTime(LocalTime.MAX);
+        validateDateRange(startDateTime, endDateTime);
 
         List<BloodSugarLog> logs = bloodSugarLogRepository
                 .findByUserIdAndMeasurementTimeBetweenAndIsDeletedFalseOrderByMeasurementTimeAsc(

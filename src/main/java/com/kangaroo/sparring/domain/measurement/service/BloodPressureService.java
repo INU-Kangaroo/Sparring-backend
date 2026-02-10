@@ -47,16 +47,19 @@ public class BloodPressureService {
 
         // 비즈니스 검증
         validateBloodPressureValues(request);
-        validateMeasurementTime(request.getMeasuredAt());
+        LocalDateTime measuredAt = LocalDateTime.of(
+                request.getMeasurementDate(),
+                request.getMeasurementTime()
+        );
+        validateMeasurementTime(measuredAt);
 
         BloodPressureLog bloodPressureLog = BloodPressureLog.create(
                 user,
                 request.getSystolic(),
                 request.getDiastolic(),
                 request.getHeartRate(),
-                request.getMeasuredAt(),
-                request.getMeasurementType(),
-                request.getNote()
+                measuredAt,
+                request.getMeasurementLabel()
         );
 
         BloodPressureLog savedLog = bloodPressureLogRepository.save(bloodPressureLog);
@@ -90,6 +93,26 @@ public class BloodPressureService {
         YearMonth yearMonth = YearMonth.of(year, month);
         LocalDateTime startDateTime = yearMonth.atDay(1).atStartOfDay();
         LocalDateTime endDateTime = yearMonth.atEndOfMonth().atTime(LocalTime.MAX);
+
+        List<BloodPressureLog> logs = bloodPressureLogRepository
+                .findByUserIdAndMeasuredAtBetweenAndIsDeletedFalseOrderByMeasuredAtAsc(
+                        userId, startDateTime, endDateTime);
+
+        return logs.stream()
+                .map(BloodPressureLogResponse::from)
+                .collect(Collectors.toList());
+    }
+
+    public List<BloodPressureLogResponse> getBloodPressureLogsByDate(Long userId, LocalDate date) {
+        log.info("일별 혈압 측정 기록 조회: userId={}, date={}", userId, date);
+
+        if (date == null) {
+            throw new CustomException(ErrorCode.INVALID_DATE_RANGE);
+        }
+
+        LocalDateTime startDateTime = date.atStartOfDay();
+        LocalDateTime endDateTime = date.atTime(LocalTime.MAX);
+        validateDateRange(startDateTime, endDateTime);
 
         List<BloodPressureLog> logs = bloodPressureLogRepository
                 .findByUserIdAndMeasuredAtBetweenAndIsDeletedFalseOrderByMeasuredAtAsc(

@@ -1,7 +1,6 @@
 package com.kangaroo.sparring.domain.measurement.entity;
 
 import com.kangaroo.sparring.domain.common.BaseEntity;
-import com.kangaroo.sparring.domain.measurement.type.BloodPressureMeasurementType;
 import com.kangaroo.sparring.domain.user.entity.User;
 import jakarta.persistence.*;
 import lombok.*;
@@ -36,31 +35,25 @@ public class BloodPressureLog extends BaseEntity {
     @Column(name = "heart_rate")
     private Integer heartRate;
 
-    @Column(name = "note", length = 500)
-    private String note;
-
     @Column(name = "measured_at", nullable = false)
     private LocalDateTime measuredAt;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "measurement_timing", nullable = false, length = 20)
-    private BloodPressureMeasurementType measurementType;
+    @Column(name = "measurement_label", nullable = false, length = 50)
+    private String measurementLabel;
 
     /**
      * 혈압 측정 기록 생성
      */
     public static BloodPressureLog create(User user, Integer systolic, Integer diastolic,
                                           Integer heartRate, LocalDateTime measuredAt,
-                                          BloodPressureMeasurementType measurementType,
-                                          String note) {
+                                          String measurementLabel) {
         return BloodPressureLog.builder()
                 .user(user)
                 .systolic(systolic)
                 .diastolic(diastolic)
                 .heartRate(heartRate)
-                .note(note)
                 .measuredAt(measuredAt)
-                .measurementType(measurementType)
+                .measurementLabel(measurementLabel)
                 .build();
     }
 }

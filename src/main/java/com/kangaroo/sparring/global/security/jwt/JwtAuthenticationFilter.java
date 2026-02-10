@@ -33,6 +33,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private static final String AUTHORIZATION_HEADER = "Authorization";
     private static final String BEARER_PREFIX = "Bearer ";
+    private static final String REFRESH_ENDPOINT = "/api/auth/refresh";
 
     private final JwtUtil jwtUtil;
     private final UserRepository userRepository;
@@ -101,6 +102,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        return REFRESH_ENDPOINT.equals(request.getServletPath());
     }
 
     private String resolveToken(HttpServletRequest request) {

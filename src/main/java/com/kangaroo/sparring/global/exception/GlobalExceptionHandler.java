@@ -28,9 +28,12 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleValidationException(MethodArgumentNotValidException e) {
         Map<String, String> errors = new HashMap<>();
         e.getBindingResult().getAllErrors().forEach(error -> {
-            String fieldName = ((FieldError) error).getField();
             String errorMessage = error.getDefaultMessage();
-            errors.put(fieldName, errorMessage);
+            if (error instanceof FieldError fieldError) {
+                errors.put(fieldError.getField(), errorMessage);
+            } else {
+                errors.put(error.getObjectName(), errorMessage);
+            }
         });
 
         return ResponseEntity
@@ -41,6 +44,13 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MissingRequestHeaderException.class)
     public ResponseEntity<ErrorResponse> handleMissingRequestHeaderException(MissingRequestHeaderException e) {
         log.warn("Missing request header: {}", e.getHeaderName());
+        if ("X-Refresh-Token".equalsIgnoreCase(e.getHeaderName())) {
+            return ResponseEntity
+                    .badRequest()
+                    .body(new ErrorResponse("MISSING_HEADER",
+                            "리프레시 토큰 헤더가 누락되었습니다: X-Refresh-Token",
+                            null));
+        }
         return ResponseEntity
                 .badRequest()
                 .body(new ErrorResponse("MISSING_HEADER",

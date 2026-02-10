@@ -28,6 +28,7 @@ public class OAuth2UserService {
         if (userInfo.getEmail() == null || userInfo.getEmail().isBlank()) {
             throw new CustomException(ErrorCode.OAUTH2_EMAIL_REQUIRED);
         }
+        String resolvedUsername = resolveUsername(userInfo);
 
         SocialProvider provider = convertToSocialProvider(userInfo.getProvider());
 
@@ -36,18 +37,18 @@ public class OAuth2UserService {
                     if (existingUser.getProvider() == null || existingUser.getProvider() != provider) {
                         throw new CustomException(ErrorCode.OAUTH2_PROVIDER_MISMATCH);
                     }
-                    return updateOAuth2User(existingUser, userInfo, provider);
+                    return updateOAuth2User(existingUser, userInfo, provider, resolvedUsername);
                 })
-                .orElseGet(() -> createOAuth2User(userInfo, provider));
+                .orElseGet(() -> createOAuth2User(userInfo, provider, resolvedUsername));
     }
 
-    private User createOAuth2User(OAuth2UserInfo userInfo, SocialProvider provider) {
+    private User createOAuth2User(OAuth2UserInfo userInfo, SocialProvider provider, String resolvedUsername) {
         log.info("Creating new OAuth2 user - Email: {}, Provider: {}", userInfo.getEmail(), provider);
         
         User user = User.builder()
                 .email(userInfo.getEmail())
                 .password(passwordEncoder.encode("OAUTH2_USER"))
-                .username(userInfo.getName())
+                .username(resolvedUsername)
                 .provider(provider)
                 .providerId(userInfo.getProviderId())
                 .profileImageUrl(userInfo.getProfileImageUrl())
@@ -59,7 +60,7 @@ public class OAuth2UserService {
         return userRepository.save(user);
     }
 
-    private User updateOAuth2User(User user, OAuth2UserInfo userInfo, SocialProvider provider) {
+    private User updateOAuth2User(User user, OAuth2UserInfo userInfo, SocialProvider provider, String resolvedUsername) {
         log.info("Updating existing user - Email: {}", userInfo.getEmail());
         
         if (user.getProvider() == null) {
@@ -68,6 +69,8 @@ public class OAuth2UserService {
         
         if (userInfo.getProfileImageUrl() != null) {
             user.updateProfile(user.getUsername(), userInfo.getProfileImageUrl());
+        } else if (user.getUsername() == null || user.getUsername().isBlank()) {
+            user.updateUsername(resolvedUsername);
         }
         
         user.updateLastLogin();
@@ -80,5 +83,20 @@ public class OAuth2UserService {
             case "KAKAO" -> SocialProvider.KAKAO;
             default -> throw new IllegalArgumentException("알 수 없는 Provider: " + provider);
         };
+    }
+
+    private String resolveUsername(OAuth2UserInfo userInfo) {
+        String name = userInfo.getName();
+        if (name != null && !name.isBlank()) {
+            return name.trim();
+        }
+        String email = userInfo.getEmail();
+        if (email != null && email.contains("@")) {
+            String localPart = email.substring(0, email.indexOf('@')).trim();
+            if (!localPart.isBlank()) {
+                return localPart;
+            }
+        }
+        return "user";
     }
 }

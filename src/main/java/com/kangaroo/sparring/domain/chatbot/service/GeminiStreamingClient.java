@@ -7,12 +7,17 @@ import com.kangaroo.sparring.global.exception.CustomException;
 import com.kangaroo.sparring.global.exception.ErrorCode;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.MediaType;
+import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StreamUtils;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -21,19 +26,13 @@ import java.util.stream.Collectors;
 @Component
 public class GeminiStreamingClient {
 
-    private static final String SYSTEM_PROMPT = """
-            당신은 건강 관리 전문 AI 어시스턴트입니다.
-            혈압, 혈당, 운동, 영양, 수면 등 건강 관련 주제에 대해 친절하고 정확하게 답변합니다.
-            의학적 진단이나 처방을 제공하지 않으며, 전문 의료진 상담을 권장합니다.
-            한국어로 답변하며, 이해하기 쉬운 언어를 사용합니다.
-            답변은 간결하고 명확하게, 필요시 bullet point를 사용합니다.
-            위험한 증상이 언급되면 즉시 의료 기관 방문을 권고합니다.
-            """;
+    private static final String SYSTEM_PROMPT_PATH = "prompts/chatbot/system_prompt.txt";
 
     private final WebClient webClient;
     private final ObjectMapper objectMapper;
     private final String apiKey;
     private final String streamingUrl;
+    private final String baseSystemPrompt;
 
     public GeminiStreamingClient(
             WebClient.Builder webClientBuilder,
@@ -46,18 +45,20 @@ public class GeminiStreamingClient {
         this.objectMapper = objectMapper;
         this.apiKey = apiKey;
         this.streamingUrl = geminiApiUrl.replace("generateContent", "streamGenerateContent");
+        this.baseSystemPrompt = readPromptTemplate(SYSTEM_PROMPT_PATH);
     }
 
     /**
      * Gemini streamGenerateContent 엔드포인트를 호출하여 텍스트 토큰 청크를 Flux로 반환한다.
      * SSE 형식(data: {...})으로 수신한 응답에서 텍스트를 추출한다.
      */
-    public Flux<String> streamChat(List<ChatMessage> history) {
+    public Flux<String> streamChat(List<ChatMessage> history, String userContextSummary) {
         String url = streamingUrl + "?key=" + apiKey + "&alt=sse";
-        Map<String, Object> requestBody = buildRequestBody(history);
+        Map<String, Object> requestBody = buildRequestBody(history, userContextSummary);
 
         return webClient.post()
                 .uri(url)
+                .accept(MediaType.TEXT_EVENT_STREAM)
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(requestBody)
                 .retrieve()
@@ -72,9 +73,9 @@ public class GeminiStreamingClient {
                                         response.statusCode(), body))
                                 .then(Mono.error(new CustomException(ErrorCode.CHATBOT_AI_CALL_FAILED)))
                 )
-                .bodyToFlux(String.class)
-                .filter(line -> line.startsWith("data: "))
-                .map(line -> line.substring(6).trim())
+                .bodyToFlux(ServerSentEvent.class)
+                .mapNotNull(sse -> toJsonString(sse.data()))
+                .map(String::trim)
                 .filter(data -> !data.isBlank() && !data.equals("[DONE]"))
                 .flatMap(this::extractTextChunk)
                 .onErrorMap(
@@ -86,9 +87,31 @@ public class GeminiStreamingClient {
                 );
     }
 
-    private Map<String, Object> buildRequestBody(List<ChatMessage> history) {
+    private String toJsonString(Object data) {
+        if (data == null) {
+            return null;
+        }
+        if (data instanceof String text) {
+            return text;
+        }
+        try {
+            return objectMapper.writeValueAsString(data);
+        } catch (Exception e) {
+            log.warn("Gemini SSE data 직렬화 실패: type={}", data.getClass().getName(), e);
+            return null;
+        }
+    }
+
+    private Map<String, Object> buildRequestBody(List<ChatMessage> history, String userContextSummary) {
+        String systemPrompt = baseSystemPrompt;
+        if (userContextSummary != null && !userContextSummary.isBlank()) {
+            systemPrompt = baseSystemPrompt + "\n\n다음은 현재 사용자 관련 참고 정보입니다.\n"
+                    + userContextSummary
+                    + "\n위 정보를 바탕으로 개인화된 답변을 하되, 정보가 부족하면 단정하지 마세요.";
+        }
+
         Map<String, Object> systemInstruction = Map.of(
-                "parts", List.of(Map.of("text", SYSTEM_PROMPT))
+                "parts", List.of(Map.of("text", systemPrompt))
         );
 
         List<Map<String, Object>> contents = history.stream()
@@ -111,20 +134,63 @@ public class GeminiStreamingClient {
     private Mono<String> extractTextChunk(String jsonData) {
         try {
             JsonNode root = objectMapper.readTree(jsonData);
-            JsonNode candidates = root.path("candidates");
-            if (candidates.isArray() && !candidates.isEmpty()) {
-                String text = candidates.get(0)
-                        .path("content")
-                        .path("parts")
-                        .get(0)
-                        .path("text")
-                        .asText("");
-                return text.isEmpty() ? Mono.empty() : Mono.just(text);
+            String text = extractTextFromRoot(root);
+            if (!text.isBlank()) {
+                return Mono.just(text);
             }
+
+            log.info("Gemini 텍스트 청크 없음: {}", jsonData);
             return Mono.empty();
         } catch (Exception e) {
-            log.debug("텍스트 추출 불가 청크 (무시): {}", jsonData);
+            log.info("Gemini 텍스트 추출 불가 청크: {}", jsonData);
             return Mono.empty();
+        }
+    }
+
+    private String extractTextFromRoot(JsonNode root) {
+        if (root == null || root.isMissingNode() || root.isNull()) {
+            return "";
+        }
+
+        if (root.isArray()) {
+            StringBuilder merged = new StringBuilder();
+            for (JsonNode node : root) {
+                appendExtractedText(node, merged);
+            }
+            return merged.toString();
+        }
+
+        StringBuilder merged = new StringBuilder();
+        appendExtractedText(root, merged);
+        return merged.toString();
+    }
+
+    private void appendExtractedText(JsonNode node, StringBuilder out) {
+        JsonNode candidates = node.path("candidates");
+        if (!candidates.isArray()) {
+            return;
+        }
+
+        for (JsonNode candidate : candidates) {
+            JsonNode parts = candidate.path("content").path("parts");
+            if (!parts.isArray()) {
+                continue;
+            }
+            for (JsonNode part : parts) {
+                String text = part.path("text").asText("");
+                if (!text.isBlank()) {
+                    out.append(text);
+                }
+            }
+        }
+    }
+
+    private String readPromptTemplate(String path) {
+        try {
+            ClassPathResource resource = new ClassPathResource(path);
+            return StreamUtils.copyToString(resource.getInputStream(), StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            throw new IllegalStateException("프롬프트 템플릿을 로드할 수 없습니다: " + path, e);
         }
     }
 }

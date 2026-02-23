@@ -3,6 +3,7 @@ package com.kangaroo.sparring.global.config;
 import com.kangaroo.sparring.global.security.jwt.JwtAccessDeniedHandler;
 import com.kangaroo.sparring.global.security.jwt.JwtAuthenticationEntryPoint;
 import com.kangaroo.sparring.global.security.jwt.JwtAuthenticationFilter;
+import jakarta.servlet.DispatcherType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -52,6 +53,7 @@ public class SecurityConfig {
                         .accessDeniedHandler(accessDeniedHandler)
                 )
                 .authorizeHttpRequests(auth -> auth
+                        .dispatcherTypeMatchers(DispatcherType.ASYNC, DispatcherType.ERROR).permitAll()
                         .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**").permitAll()
                         .requestMatchers("/api/auth/**").permitAll()
                         .anyRequest().authenticated()

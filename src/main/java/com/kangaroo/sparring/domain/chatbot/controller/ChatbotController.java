@@ -71,17 +71,7 @@ public class ChatbotController {
         return ResponseEntity.ok(MessageResponse.of("대화 세션이 삭제되었습니다."));
     }
 
-    @Operation(
-            summary = "챗봇 메시지 스트리밍",
-            description = """
-                    메시지를 전송하고 AI 응답을 SSE(Server-Sent Events) 스트림으로 수신합니다.
-
-                    **이벤트 타입:**
-                    - `data`: 텍스트 토큰 청크 (메시지 본문)
-                    - `event: error`: 오류 발생 시 오류 메시지
-                    - `event: done` / `data: [DONE]`: 스트리밍 완료 신호
-                    """
-    )
+    @Operation(summary = "챗봇 메시지 스트리밍", description = "메시지 전송 후 AI 응답 스트리밍 수신")
     @PostMapping(value = "/sessions/{sessionId}/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter streamChat(
             @AuthenticationPrincipal UserIdPrincipal principal,

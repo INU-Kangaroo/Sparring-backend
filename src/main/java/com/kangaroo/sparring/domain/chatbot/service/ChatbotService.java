@@ -7,17 +7,26 @@ import com.kangaroo.sparring.domain.chatbot.session.ChatMessage;
 import com.kangaroo.sparring.domain.chatbot.session.ChatSession;
 import com.kangaroo.sparring.domain.chatbot.session.ChatSessionRepository;
 import com.kangaroo.sparring.domain.chatbot.type.MessageRole;
+import com.kangaroo.sparring.domain.healthprofile.entity.HealthProfile;
+import com.kangaroo.sparring.domain.healthprofile.repository.HealthProfileRepository;
+import com.kangaroo.sparring.domain.measurement.entity.BloodPressureLog;
+import com.kangaroo.sparring.domain.measurement.entity.BloodSugarLog;
+import com.kangaroo.sparring.domain.measurement.repository.BloodPressureLogRepository;
+import com.kangaroo.sparring.domain.measurement.repository.BloodSugarLogRepository;
 import com.kangaroo.sparring.global.exception.CustomException;
 import com.kangaroo.sparring.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import reactor.core.Disposable;
 import reactor.core.scheduler.Schedulers;
 
 import java.io.IOException;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.Period;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -31,6 +40,9 @@ public class ChatbotService {
 
     private final ChatSessionRepository sessionRepository;
     private final GeminiStreamingClient geminiStreamingClient;
+    private final HealthProfileRepository healthProfileRepository;
+    private final BloodPressureLogRepository bloodPressureLogRepository;
+    private final BloodSugarLogRepository bloodSugarLogRepository;
 
     public ChatSessionResponse createSession(Long userId, CreateSessionRequest request) {
         String sessionId = UUID.randomUUID().toString();
@@ -81,8 +93,12 @@ public class ChatbotService {
         AtomicBoolean completed = new AtomicBoolean(false);
         AtomicReference<Disposable> subscriptionRef = new AtomicReference<>();
         StringBuilder fullResponse = new StringBuilder();
+        String userContextSummary = buildUserContextSummary(userId);
+        log.debug("챗봇 컨텍스트 포함 여부: included={}, length={}",
+                !userContextSummary.isBlank(),
+                userContextSummary.length());
 
-        Disposable subscription = geminiStreamingClient.streamChat(updatedSession.getMessages())
+        Disposable subscription = geminiStreamingClient.streamChat(updatedSession.getMessages(), userContextSummary)
                 .subscribeOn(Schedulers.boundedElastic())
                 .subscribe(
                         // onNext: 토큰 청크를 클라이언트로 전송
@@ -199,5 +215,61 @@ public class ChatbotService {
     private ChatSession findSessionOrThrow(Long userId, String sessionId) {
         return sessionRepository.findById(userId, sessionId)
                 .orElseThrow(() -> new CustomException(ErrorCode.CHATBOT_SESSION_NOT_FOUND));
+    }
+
+    private String buildUserContextSummary(Long userId) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("[사용자 건강 컨텍스트]\n");
+
+        HealthProfile profile = healthProfileRepository.findByUserId(userId).orElse(null);
+        if (profile != null) {
+            if (profile.getBirthDate() != null) {
+                int age = Period.between(profile.getBirthDate(), LocalDate.now()).getYears();
+                sb.append("- 나이: ").append(age).append("세\n");
+            }
+            if (profile.getGender() != null) {
+                sb.append("- 성별: ").append(profile.getGender()).append("\n");
+            }
+            if (profile.getBloodPressureStatus() != null) {
+                sb.append("- 혈압 상태: ").append(profile.getBloodPressureStatus()).append("\n");
+            }
+            if (profile.getBloodSugarStatus() != null) {
+                sb.append("- 혈당 상태: ").append(profile.getBloodSugarStatus()).append("\n");
+            }
+            if (profile.getMedications() != null && !profile.getMedications().isBlank()) {
+                sb.append("- 복용약: ").append(profile.getMedications()).append("\n");
+            }
+            if (profile.getHealthGoal() != null && !profile.getHealthGoal().isBlank()) {
+                sb.append("- 건강 목표: ").append(profile.getHealthGoal()).append("\n");
+            }
+        }
+
+        List<BloodPressureLog> bloodPressureLogs = bloodPressureLogRepository.findRecentByUserId(
+                userId,
+                PageRequest.of(0, 3)
+        );
+        if (!bloodPressureLogs.isEmpty()) {
+            List<String> recentBp = bloodPressureLogs.stream()
+                    .map(log -> log.getSystolic() + "/" + log.getDiastolic())
+                    .toList();
+            sb.append("- 최근 혈압(최신순): ").append(String.join(", ", recentBp)).append("\n");
+        }
+
+        List<BloodSugarLog> bloodSugarLogs = bloodSugarLogRepository.findRecentByUserId(
+                userId,
+                PageRequest.of(0, 3)
+        );
+        if (!bloodSugarLogs.isEmpty()) {
+            List<String> recentSugar = bloodSugarLogs.stream()
+                    .map(log -> log.getGlucoseLevel() + " mg/dL")
+                    .toList();
+            sb.append("- 최근 혈당(최신순): ").append(String.join(", ", recentSugar)).append("\n");
+        }
+
+        if (sb.toString().equals("[사용자 건강 컨텍스트]\n")) {
+            return "";
+        }
+        sb.append("- 기준 시각: ").append(LocalDateTime.now()).append("\n");
+        return sb.toString();
     }
 }

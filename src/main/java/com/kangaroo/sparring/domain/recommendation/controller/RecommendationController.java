@@ -69,6 +69,4 @@ public class RecommendationController {
                 .refreshSupplementRecommendations(userId);
         return ResponseEntity.ok(response);
     }
-
-    
 }

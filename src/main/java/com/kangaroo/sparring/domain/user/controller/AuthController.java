@@ -10,7 +10,7 @@ import com.kangaroo.sparring.domain.user.dto.res.AuthResponse;
 import com.kangaroo.sparring.domain.user.dto.res.EmailResponse;
 import com.kangaroo.sparring.domain.user.service.UserAccountService;
 import com.kangaroo.sparring.domain.user.service.AuthTokenService;
-import com.kangaroo.sparring.domain.user.service.UserService;
+import com.kangaroo.sparring.domain.user.service.UserRegistrationService;
 import com.kangaroo.sparring.global.email.EmailService;
 import com.kangaroo.sparring.global.email.EmailVerificationResult;
 import com.kangaroo.sparring.global.exception.CustomException;
@@ -38,7 +38,7 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 public class AuthController {
 
-    private final UserService userService;
+    private final UserRegistrationService userRegistrationService;
     private final UserAccountService userAccountService;
     private final AuthTokenService authTokenService;
     private final EmailService emailService;
@@ -181,7 +181,7 @@ public class AuthController {
     )
     @PostMapping("/signup")
     public ResponseEntity<EmailResponse> signup(@Valid @RequestBody SignupRequest request) {
-        userService.signup(request);
+        userRegistrationService.signup(request);
         return ResponseEntity.ok(EmailResponse.of(request.getEmail(), "회원가입이 완료되었습니다."));
     }
 
@@ -278,7 +278,7 @@ public class AuthController {
             @Valid @RequestBody SocialSignupCompleteRequest request
     ) {
         Long userId = PrincipalResolver.resolveUserId(principal);
-        userService.completeSocialSignup(userId, request);
+        userRegistrationService.completeSocialSignup(userId, request);
         String email = userAccountService.getEmailOrThrow(userId);
         return ResponseEntity.ok(EmailResponse.of(email, "회원가입이 완료되었습니다."));
     }

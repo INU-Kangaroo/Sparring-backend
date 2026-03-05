@@ -19,7 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
-public class UserService {
+public class UserRegistrationService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
@@ -30,7 +30,6 @@ public class UserService {
     public void signup(SignupRequest request) {
         log.info("회원가입 시도: {}", request.getEmail());
 
-        // 이메일 인증 확인
         if (!emailService.isEmailVerified(request.getEmail())) {
             throw new CustomException(ErrorCode.EMAIL_NOT_VERIFIED);
         }
@@ -40,9 +39,7 @@ public class UserService {
         HealthProfile profile = getOrCreateHealthProfile(user);
         applySignupProfile(user, profile, request);
 
-        // 인증 플래그 삭제
         emailService.deleteVerifiedFlag(request.getEmail());
-
         log.info("회원가입 성공: userId={}, email={}", user.getId(), user.getEmail());
     }
 
@@ -69,14 +66,12 @@ public class UserService {
         healthProfileRepository.save(profile);
     }
 
-    // 이메일 중복 체크
     private void validateDuplicateEmail(String email) {
         if (userRepository.existsByEmail(email)) {
             throw new CustomException(ErrorCode.DUPLICATE_EMAIL);
         }
     }
 
-    // 사용자 생성
     private User createUser(SignupRequest request) {
         return User.builder()
                 .email(request.getEmail())
@@ -113,5 +108,4 @@ public class UserService {
         return healthProfileRepository.findByUserId(user.getId())
                 .orElseGet(() -> healthProfileRepository.save(HealthProfile.builder().user(user).build()));
     }
-
 }

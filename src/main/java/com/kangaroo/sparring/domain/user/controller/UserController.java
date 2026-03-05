@@ -4,7 +4,8 @@ import com.kangaroo.sparring.domain.user.dto.req.ChangePasswordRequest;
 import com.kangaroo.sparring.domain.user.dto.req.DeleteAccountRequest;
 import com.kangaroo.sparring.domain.user.dto.req.UpdateUserProfileRequest;
 import com.kangaroo.sparring.domain.user.dto.res.UserProfileResponse;
-import com.kangaroo.sparring.domain.user.service.UserService;
+import com.kangaroo.sparring.domain.user.service.account.UserAccountService;
+import com.kangaroo.sparring.domain.user.service.profile.UserProfileService;
 import com.kangaroo.sparring.global.response.MessageResponse;
 import com.kangaroo.sparring.global.security.principal.PrincipalResolver;
 import com.kangaroo.sparring.global.security.principal.UserIdPrincipal;
@@ -26,7 +27,8 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 public class UserController {
 
-    private final UserService userService;
+    private final UserProfileService userProfileService;
+    private final UserAccountService userAccountService;
 
     @Operation(summary = "프로필 조회", description = "현재 로그인 사용자의 프로필 조회")
     @GetMapping
@@ -34,7 +36,7 @@ public class UserController {
             @AuthenticationPrincipal UserIdPrincipal principal
     ) {
         Long userId = PrincipalResolver.resolveUserId(principal);
-        return ResponseEntity.ok(userService.getProfile(userId));
+        return ResponseEntity.ok(userProfileService.getProfile(userId));
     }
 
     @Operation(summary = "프로필 수정", description = "이름/생년월일/키/몸무게 수정")
@@ -44,7 +46,7 @@ public class UserController {
             @Valid @RequestBody UpdateUserProfileRequest request
     ) {
         Long userId = PrincipalResolver.resolveUserId(principal);
-        return ResponseEntity.ok(userService.updateProfile(userId, request));
+        return ResponseEntity.ok(userProfileService.updateProfile(userId, request));
     }
 
     @Operation(summary = "비밀번호 변경", description = "현재 비밀번호 확인 후 비밀번호 변경")
@@ -71,7 +73,12 @@ public class UserController {
             @Valid @RequestBody ChangePasswordRequest request
     ) {
         Long userId = PrincipalResolver.resolveUserId(principal);
-        userService.changePassword(userId, request.getCurrentPassword(), request.getNewPassword(), request.getNewPasswordConfirm());
+        userAccountService.changePassword(
+                userId,
+                request.getCurrentPassword(),
+                request.getNewPassword(),
+                request.getNewPasswordConfirm()
+        );
         return ResponseEntity.ok(MessageResponse.of("비밀번호가 변경되었습니다."));
     }
 
@@ -100,7 +107,7 @@ public class UserController {
     ) {
         Long userId = PrincipalResolver.resolveUserId(principal);
         String password = request != null ? request.getPassword() : null;
-        userService.deleteAccount(userId, password);
+        userAccountService.deleteAccount(userId, password);
         return ResponseEntity.ok(MessageResponse.of("회원 탈퇴가 완료되었습니다."));
     }
 }

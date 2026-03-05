@@ -1,4 +1,4 @@
-package com.kangaroo.sparring.domain.user.service;
+package com.kangaroo.sparring.domain.user.service.auth;
 
 import com.kangaroo.sparring.domain.user.dto.req.LoginRequest;
 import com.kangaroo.sparring.domain.user.dto.res.AuthResponse;

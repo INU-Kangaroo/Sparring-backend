@@ -3,7 +3,7 @@ package com.kangaroo.sparring.global.security.oauth2.service;
 import com.kangaroo.sparring.domain.user.dto.req.OAuth2CodeRequest;
 import com.kangaroo.sparring.domain.user.dto.res.AuthResponse;
 import com.kangaroo.sparring.domain.user.entity.User;
-import com.kangaroo.sparring.domain.user.service.OAuth2UserService;
+import com.kangaroo.sparring.domain.user.service.oauth2.OAuth2UserService;
 import com.kangaroo.sparring.global.exception.CustomException;
 import com.kangaroo.sparring.global.exception.ErrorCode;
 import com.kangaroo.sparring.global.security.jwt.JwtUtil;

@@ -1,7 +1,7 @@
 package com.kangaroo.sparring.domain.insight.controller;
 
 import com.kangaroo.sparring.domain.insight.dto.res.TodayInsightResponse;
-import com.kangaroo.sparring.domain.insight.service.HomeService;
+import com.kangaroo.sparring.domain.insight.service.InsightService;
 import com.kangaroo.sparring.global.security.principal.PrincipalResolver;
 import com.kangaroo.sparring.global.security.principal.UserIdPrincipal;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -20,10 +20,10 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/insights")
 @RequiredArgsConstructor
-@Tag(name = "홈", description = "메인 홈 화면 API")
-public class HomeController {
+@Tag(name = "인사이트", description = "사용자 인사이트 API")
+public class InsightController {
 
-    private final HomeService homeService;
+    private final InsightService insightService;
 
     @GetMapping("/today")
     @Operation(
@@ -52,6 +52,6 @@ public class HomeController {
     public ResponseEntity<TodayInsightResponse> getTodayInsight(
             @AuthenticationPrincipal UserIdPrincipal principal) {
         Long userId = PrincipalResolver.resolveUserId(principal);
-        return ResponseEntity.ok(homeService.getTodayInsight(userId));
+        return ResponseEntity.ok(insightService.getTodayInsight(userId));
     }
 }

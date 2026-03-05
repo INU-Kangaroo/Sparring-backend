@@ -1,4 +1,4 @@
-package com.kangaroo.sparring.domain.user.service;
+package com.kangaroo.sparring.domain.user.service.account;
 
 import com.kangaroo.sparring.domain.user.entity.User;
 import com.kangaroo.sparring.domain.user.repository.UserRepository;

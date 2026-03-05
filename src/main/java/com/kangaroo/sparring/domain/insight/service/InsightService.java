@@ -18,7 +18,7 @@ import java.util.Optional;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 @Slf4j
-public class HomeService {
+public class InsightService {
 
     private final InsightContextBuilder insightContextBuilder;
     private final InsightPromptSupport insightPromptSupport;

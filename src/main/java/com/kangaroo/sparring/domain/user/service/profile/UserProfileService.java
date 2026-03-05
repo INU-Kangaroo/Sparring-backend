@@ -1,4 +1,4 @@
-package com.kangaroo.sparring.domain.user.service;
+package com.kangaroo.sparring.domain.user.service.profile;
 
 import com.kangaroo.sparring.domain.healthprofile.entity.HealthProfile;
 import com.kangaroo.sparring.domain.healthprofile.repository.HealthProfileRepository;

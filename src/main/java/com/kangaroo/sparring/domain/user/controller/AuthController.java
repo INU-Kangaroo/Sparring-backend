@@ -8,6 +8,7 @@ import com.kangaroo.sparring.domain.user.dto.req.SocialSignupCompleteRequest;
 import com.kangaroo.sparring.domain.user.dto.req.VerifyCodeRequest;
 import com.kangaroo.sparring.domain.user.dto.res.AuthResponse;
 import com.kangaroo.sparring.domain.user.dto.res.EmailResponse;
+import com.kangaroo.sparring.domain.user.service.AuthTokenService;
 import com.kangaroo.sparring.domain.user.service.UserService;
 import com.kangaroo.sparring.global.email.EmailService;
 import com.kangaroo.sparring.global.email.EmailVerificationResult;
@@ -37,6 +38,7 @@ import org.springframework.web.bind.annotation.*;
 public class AuthController {
 
     private final UserService userService;
+    private final AuthTokenService authTokenService;
     private final EmailService emailService;
     private final OAuth2CodeAuthService oAuth2CodeAuthService;
 
@@ -184,7 +186,7 @@ public class AuthController {
     @Operation(summary = "로그인", description = "이메일/비밀번호 로그인")
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
-        AuthResponse response = userService.login(request);
+        AuthResponse response = authTokenService.login(request);
         return ResponseEntity.ok(response);
     }
 
@@ -288,7 +290,7 @@ public class AuthController {
             @Parameter(description = "리프레시 토큰", required = true)
             @RequestHeader("X-Refresh-Token") String refreshToken) {
 
-        AuthResponse response = userService.refreshAccessToken(refreshToken);
+        AuthResponse response = authTokenService.refreshAccessToken(refreshToken);
         return ResponseEntity.ok(response);
     }
 
@@ -319,7 +321,7 @@ public class AuthController {
             accessToken = accessToken.substring(7);
         }
 
-        userService.logout(accessToken);
+        authTokenService.logout(accessToken);
         return ResponseEntity.ok(MessageResponse.of("로그아웃이 완료되었습니다."));
     }
 

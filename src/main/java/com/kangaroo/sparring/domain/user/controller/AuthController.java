@@ -8,6 +8,7 @@ import com.kangaroo.sparring.domain.user.dto.req.SocialSignupCompleteRequest;
 import com.kangaroo.sparring.domain.user.dto.req.VerifyCodeRequest;
 import com.kangaroo.sparring.domain.user.dto.res.AuthResponse;
 import com.kangaroo.sparring.domain.user.dto.res.EmailResponse;
+import com.kangaroo.sparring.domain.user.service.UserAccountService;
 import com.kangaroo.sparring.domain.user.service.AuthTokenService;
 import com.kangaroo.sparring.domain.user.service.UserService;
 import com.kangaroo.sparring.global.email.EmailService;
@@ -38,6 +39,7 @@ import org.springframework.web.bind.annotation.*;
 public class AuthController {
 
     private final UserService userService;
+    private final UserAccountService userAccountService;
     private final AuthTokenService authTokenService;
     private final EmailService emailService;
     private final OAuth2CodeAuthService oAuth2CodeAuthService;
@@ -122,7 +124,7 @@ public class AuthController {
             if (principal == null || !result.getUserId().equals(principal.getUserId())) {
                 throw new CustomException(ErrorCode.UNAUTHORIZED);
             }
-            userService.updateEmail(result.getUserId(), result.getEmail());
+            userAccountService.updateEmail(result.getUserId(), result.getEmail());
             return ResponseEntity.ok(EmailResponse.of(result.getEmail(), "이메일 변경이 완료되었습니다."));
         }
 
@@ -277,7 +279,7 @@ public class AuthController {
     ) {
         Long userId = PrincipalResolver.resolveUserId(principal);
         userService.completeSocialSignup(userId, request);
-        String email = userService.getUserOrThrow(userId).getEmail();
+        String email = userAccountService.getEmailOrThrow(userId);
         return ResponseEntity.ok(EmailResponse.of(email, "회원가입이 완료되었습니다."));
     }
 

@@ -74,6 +74,11 @@ public enum ErrorCode {
     // Home
     INSIGHT_GENERATE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "H001", "인사이트 생성에 실패했습니다"),
 
+    // Log
+    MEAL_LOG_NOT_FOUND(HttpStatus.NOT_FOUND, "L001", "식사 기록을 찾을 수 없습니다"),
+    EXERCISE_LOG_NOT_FOUND(HttpStatus.NOT_FOUND, "L002", "운동 기록을 찾을 수 없습니다"),
+    LOG_ACCESS_DENIED(HttpStatus.FORBIDDEN, "L003", "해당 기록에 접근 권한이 없습니다"),
+
     // Common
     INVALID_INPUT(HttpStatus.BAD_REQUEST, "C001", "잘못된 입력값입니다"),
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "C002", "서버 오류가 발생했습니다");

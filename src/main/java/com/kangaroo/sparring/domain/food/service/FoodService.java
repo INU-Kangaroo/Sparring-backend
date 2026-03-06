@@ -10,11 +10,20 @@ import com.kangaroo.sparring.global.exception.CustomException;
 import com.kangaroo.sparring.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Stream;
 import java.util.stream.Collectors;
 
 /**
@@ -25,31 +34,72 @@ import java.util.stream.Collectors;
 @Transactional(readOnly = true)
 @Slf4j
 public class FoodService {
+    private static final int DEFAULT_SEARCH_LIMIT = 20;
+    private static final int MAX_SEARCH_LIMIT = 50;
+    private static final int DEFAULT_SEARCH_PAGE = 0;
+    private static final int MAX_SEARCH_PAGE = 1000;
+    private static final int EXACT_CANDIDATE_LIMIT = 30;
+    private static final int PREFIX_CANDIDATE_LIMIT = 150;
+    private static final int CONTAINS_CANDIDATE_LIMIT_PER_TERM = 250;
+    private static final int CANDIDATE_HARD_LIMIT = 2000;
+
+    private static final Map<String, List<String>> TOKEN_SYNONYM_MAP = Map.ofEntries(
+            Map.entry("닭가슴살", List.of("닭가슴", "닭고기", "치킨브레스트", "chicken breast", "chickenbreast")),
+            Map.entry("닭", List.of("치킨", "chicken")),
+            Map.entry("고구마", List.of("sweet potato", "sweetpotato")),
+            Map.entry("현미", List.of("brown rice", "brownrice")),
+            Map.entry("샐러드", List.of("salad"))
+    );
 
     private final FoodRepository foodRepository;
     private final MealNutritionRepository mealNutritionRepository;
-    // 외부 음식 API 연동 시 주입
-    // private final ExternalFoodApiClient externalFoodApiClient;
 
     /**
      * 음식 검색
-     * 1. DB에서 먼저 검색 (캐시)
-     * 2. 없으면 외부 API 호출
+     * DB에서 음식명으로 검색
      */
-    public List<FoodResponse> searchFood(String keyword) {
+    public List<FoodResponse> searchFood(String keyword, Integer limit, Integer page) {
         String normalizedKeyword = normalizeRequiredText(keyword);
-        log.info("음식 검색 시작: keyword={}", normalizedKeyword);
+        int validatedLimit = validateLimit(limit);
+        int validatedPage = validatePage(page);
+        long offset = (long) validatedPage * validatedLimit;
+        Set<String> searchTerms = buildSearchTerms(normalizedKeyword);
+        log.info(
+                "음식 검색 시작: keyword={}, limit={}, page={}, terms={}",
+                normalizedKeyword,
+                validatedLimit,
+                validatedPage,
+                searchTerms.size()
+        );
 
-        // 1. DB에서 먼저 검색
-        List<Food> foods = foodRepository.searchActiveByName(normalizedKeyword);
+        Map<Long, Food> candidates = new LinkedHashMap<>();
+        addCandidates(candidates, foodRepository.searchActiveByExactName(
+                normalizedKeyword,
+                PageRequest.of(0, EXACT_CANDIDATE_LIMIT)
+        ));
+        addCandidates(candidates, foodRepository.searchActiveByPrefixName(
+                normalizedKeyword,
+                PageRequest.of(0, PREFIX_CANDIDATE_LIMIT)
+        ));
 
-        if (foods.isEmpty()) {
-            log.info("DB에 음식 없음, 외부 API 호출 필요: keyword={}", normalizedKeyword);
-            // 외부 API 연동 전까지는 DB 결과만 반환
-            // foods = externalFoodApiClient.searchAndCache(normalizedKeyword);
+        for (String searchTerm : searchTerms) {
+            if (candidates.size() >= CANDIDATE_HARD_LIMIT) {
+                break;
+            }
+            List<Food> found = foodRepository.searchActiveByName(
+                    searchTerm,
+                    PageRequest.of(0, CONTAINS_CANDIDATE_LIMIT_PER_TERM)
+            );
+            addCandidates(candidates, found);
         }
 
-        return foods.stream()
+        return candidates.values().stream()
+                .sorted(Comparator
+                        .comparingInt((Food food) -> scoreFoodName(food.getName(), normalizedKeyword, searchTerms))
+                        .reversed()
+                        .thenComparing(Food::getName, String.CASE_INSENSITIVE_ORDER))
+                .skip(offset)
+                .limit(validatedLimit)
                 .map(FoodResponse::from)
                 .collect(Collectors.toList());
     }
@@ -69,7 +119,7 @@ public class FoodService {
     }
 
     /**
-     * 음식 생성 (관리자용 또는 외부 API 캐싱용)
+     * 음식 생성 (관리자용)
      */
     @Transactional
     public Long createFood(String name, Double servingSize, String servingUnit,
@@ -136,6 +186,134 @@ public class FoodService {
             if (Objects.isNull(value) || value < 0d) {
                 throw new CustomException(ErrorCode.INVALID_INPUT);
             }
+        }
+    }
+
+    private int validateLimit(Integer limit) {
+        if (limit == null) {
+            return DEFAULT_SEARCH_LIMIT;
+        }
+        if (limit <= 0 || limit > MAX_SEARCH_LIMIT) {
+            throw new CustomException(ErrorCode.INVALID_INPUT);
+        }
+        return limit;
+    }
+
+    private int validatePage(Integer page) {
+        if (page == null) {
+            return DEFAULT_SEARCH_PAGE;
+        }
+        if (page < 0 || page > MAX_SEARCH_PAGE) {
+            throw new CustomException(ErrorCode.INVALID_INPUT);
+        }
+        return page;
+    }
+
+    private Set<String> buildSearchTerms(String keyword) {
+        String normalizedKeyword = normalizeForMatch(keyword);
+
+        Stream<String> tokenExpandedTerms = Arrays.stream(keyword.split("\\s+"))
+                .map(this::normalizeForMatch)
+                .filter(token -> !token.isEmpty())
+                .flatMap(token -> Stream.concat(
+                        Stream.of(token),
+                        TOKEN_SYNONYM_MAP.getOrDefault(token, List.of()).stream().map(this::normalizeForMatch)
+                ));
+
+        Stream<String> keywordSynonyms = TOKEN_SYNONYM_MAP.getOrDefault(normalizedKeyword, List.of()).stream()
+                .map(this::normalizeForMatch);
+
+        return Stream.concat(
+                        Stream.of(normalizedKeyword, keyword.toLowerCase(Locale.ROOT).trim()),
+                        Stream.concat(keywordSynonyms, tokenExpandedTerms)
+                )
+                .filter(term -> !term.isBlank())
+                .collect(Collectors.toCollection(java.util.LinkedHashSet::new));
+    }
+
+    private int scoreFoodName(String foodName, String keyword, Set<String> searchTerms) {
+        String normalizedName = normalizeForMatch(foodName);
+        String normalizedKeyword = normalizeForMatch(keyword);
+        String lowerFoodName = foodName.toLowerCase(Locale.ROOT);
+        String lowerKeyword = keyword.toLowerCase(Locale.ROOT).trim();
+
+        int score = 0;
+
+        if (lowerFoodName.equals(lowerKeyword) || normalizedName.equals(normalizedKeyword)) {
+            score += 1000;
+        }
+        if (lowerFoodName.startsWith(lowerKeyword) || normalizedName.startsWith(normalizedKeyword)) {
+            score += 600;
+        }
+        if (lowerFoodName.contains(lowerKeyword) || normalizedName.contains(normalizedKeyword)) {
+            score += 400;
+        }
+        if (normalizedName.equals(normalizedKeyword)) {
+            score += 600;
+        } else if (normalizedName.startsWith(normalizedKeyword + " ")) {
+            score += 220;
+        }
+
+        int lengthGap = Math.abs(normalizedName.length() - normalizedKeyword.length());
+        score += Math.max(0, 140 - (lengthGap * 4));
+
+        if (foodName.startsWith("[") || foodName.startsWith("(")) {
+            score -= 80;
+        }
+        if (normalizedName.length() - normalizedKeyword.length() >= 12) {
+            score -= 50;
+        }
+
+        for (String searchTerm : searchTerms) {
+            String normalizedTerm = normalizeForMatch(searchTerm);
+            if (normalizedTerm.isEmpty() || normalizedTerm.equals(normalizedKeyword)) {
+                continue;
+            }
+            if (normalizedName.startsWith(normalizedTerm)) {
+                score += 120;
+            } else if (normalizedName.contains(normalizedTerm)) {
+                score += 70;
+            }
+        }
+
+        for (String token : splitTokens(normalizedKeyword)) {
+            if (!token.isBlank() && normalizedName.contains(token)) {
+                score += 20;
+            }
+        }
+
+        return score;
+    }
+
+    private List<String> splitTokens(String text) {
+        List<String> tokens = new ArrayList<>();
+        for (String token : text.split("\\s+")) {
+            String normalized = normalizeForMatch(token);
+            if (!normalized.isBlank()) {
+                tokens.add(normalized);
+            }
+        }
+        return tokens;
+    }
+
+    private String normalizeForMatch(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value.toLowerCase(Locale.ROOT)
+                .replaceAll("\\[[^\\]]*\\]", " ")
+                .replaceAll("\\([^)]*\\)", " ")
+                .replaceAll("[^0-9a-z가-힣\\s]", " ")
+                .replaceAll("\\s+", " ")
+                .trim();
+    }
+
+    private void addCandidates(Map<Long, Food> candidates, List<Food> foods) {
+        for (Food food : foods) {
+            if (candidates.size() >= CANDIDATE_HARD_LIMIT) {
+                break;
+            }
+            candidates.putIfAbsent(food.getId(), food);
         }
     }
 }

@@ -22,14 +22,18 @@ public class FoodController {
 
     @Operation(
             summary = "음식 검색",
-            description = "음식명으로 DB 캐시를 검색한다. 외부 API 연동은 추후 추가될 예정이다."
+            description = "음식명으로 내부 DB를 검색한다."
     )
     @GetMapping("/search")
     public ResponseEntity<List<FoodResponse>> searchFood(
             @Parameter(description = "검색 키워드", example = "닭가슴살")
-            @RequestParam String keyword
+            @RequestParam String keyword,
+            @Parameter(description = "최대 조회 개수 (1~50)", example = "20")
+            @RequestParam(required = false) Integer limit,
+            @Parameter(description = "페이지 번호 (0부터 시작)", example = "0")
+            @RequestParam(required = false) Integer page
     ) {
-        List<FoodResponse> foods = foodService.searchFood(keyword);
+        List<FoodResponse> foods = foodService.searchFood(keyword, limit, page);
         return ResponseEntity.ok(foods);
     }
 

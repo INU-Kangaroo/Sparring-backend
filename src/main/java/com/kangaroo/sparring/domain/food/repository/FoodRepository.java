@@ -1,6 +1,7 @@
 package com.kangaroo.sparring.domain.food.repository;
 
 import com.kangaroo.sparring.domain.food.entity.Food;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -27,6 +28,33 @@ public interface FoodRepository extends JpaRepository<Food, Long> {
     /**
      * 삭제되지 않은 음식만 조회
      */
-    @Query("SELECT f FROM Food f LEFT JOIN FETCH f.mealNutrition WHERE f.isDeleted = false AND LOWER(f.name) LIKE LOWER(CONCAT('%', :keyword, '%'))")
-    List<Food> searchActiveByName(@Param("keyword") String keyword);
+    @Query("""
+            SELECT f
+            FROM Food f
+            LEFT JOIN FETCH f.mealNutrition
+            WHERE f.isDeleted = false
+              AND LOWER(TRIM(f.name)) = LOWER(TRIM(:keyword))
+            ORDER BY f.name ASC
+            """)
+    List<Food> searchActiveByExactName(@Param("keyword") String keyword, Pageable pageable);
+
+    @Query("""
+            SELECT f
+            FROM Food f
+            LEFT JOIN FETCH f.mealNutrition
+            WHERE f.isDeleted = false
+              AND LOWER(f.name) LIKE LOWER(CONCAT(:keyword, '%'))
+            ORDER BY f.name ASC
+            """)
+    List<Food> searchActiveByPrefixName(@Param("keyword") String keyword, Pageable pageable);
+
+    @Query("""
+            SELECT f
+            FROM Food f
+            LEFT JOIN FETCH f.mealNutrition
+            WHERE f.isDeleted = false
+              AND LOWER(f.name) LIKE LOWER(CONCAT('%', :keyword, '%'))
+            ORDER BY f.name ASC
+            """)
+    List<Food> searchActiveByName(@Param("keyword") String keyword, Pageable pageable);
 }

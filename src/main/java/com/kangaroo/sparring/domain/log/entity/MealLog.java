@@ -21,6 +21,8 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @Builder
 public class MealLog extends BaseEntity {
+    private static final double DEFAULT_SERVING_SIZE_GRAM = 100d;
+
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -44,6 +46,9 @@ public class MealLog extends BaseEntity {
     @Column(name = "eaten_at", nullable = false)
     private LocalDateTime eatenAt;
 
+    @Column(name = "eaten_amount_gram")
+    private Double eatenAmountGram;
+
     @Column(name = "calories")
     private Double calories;
 
@@ -59,8 +64,10 @@ public class MealLog extends BaseEntity {
     @Column(name = "sodium")
     private Double sodium;
 
-    public static MealLog withFood(User user, Food food, MealTime mealTime, LocalDateTime eatenAt) {
+    public static MealLog withFood(User user, Food food, MealTime mealTime, LocalDateTime eatenAt, Double eatenAmountGram) {
         MealNutrition nutrition = food.getMealNutrition();
+        double baseServingSize = resolveBaseServingSize(food.getServingSize());
+        double ratio = eatenAmountGram / baseServingSize;
 
         return MealLog.builder()
                 .user(user)
@@ -68,11 +75,12 @@ public class MealLog extends BaseEntity {
                 .foodName(food.getName())
                 .mealTime(mealTime)
                 .eatenAt(eatenAt)
-                .calories(nutrition != null ? nutrition.getCalories() : null)
-                .carbs(nutrition != null ? nutrition.getCarbs() : null)
-                .protein(nutrition != null ? nutrition.getProtein() : null)
-                .fat(nutrition != null ? nutrition.getFat() : null)
-                .sodium(nutrition != null ? nutrition.getSodium() : null)
+                .eatenAmountGram(eatenAmountGram)
+                .calories(scaleNutrition(nutrition != null ? nutrition.getCalories() : null, ratio))
+                .carbs(scaleNutrition(nutrition != null ? nutrition.getCarbs() : null, ratio))
+                .protein(scaleNutrition(nutrition != null ? nutrition.getProtein() : null, ratio))
+                .fat(scaleNutrition(nutrition != null ? nutrition.getFat() : null, ratio))
+                .sodium(scaleNutrition(nutrition != null ? nutrition.getSodium() : null, ratio))
                 .build();
     }
 
@@ -84,5 +92,19 @@ public class MealLog extends BaseEntity {
                 .mealTime(mealTime)
                 .eatenAt(eatenAt)
                 .build();
+    }
+
+    private static Double scaleNutrition(Double value, double ratio) {
+        if (value == null) {
+            return null;
+        }
+        return value * ratio;
+    }
+
+    private static double resolveBaseServingSize(Double servingSize) {
+        if (servingSize == null || servingSize <= 0d) {
+            return DEFAULT_SERVING_SIZE_GRAM;
+        }
+        return servingSize;
     }
 }

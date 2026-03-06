@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonFormat;
 import com.kangaroo.sparring.domain.log.type.MealTime;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -28,4 +29,9 @@ public class MealLogCreateRequest {
     @JsonFormat(pattern = "HH:mm")
     @NotNull(message = "섭취 시간은 필수입니다")
     private LocalTime eatenTime;
+
+    @Schema(description = "실제 섭취량 (g)", example = "180", requiredMode = Schema.RequiredMode.REQUIRED)
+    @NotNull(message = "섭취량은 필수입니다")
+    @Positive(message = "섭취량은 0보다 커야 합니다")
+    private Double eatenAmountGram;
 }

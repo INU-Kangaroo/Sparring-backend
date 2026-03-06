@@ -35,14 +35,21 @@ public class MealLogService {
 
     @Transactional
     public MealLogResponse createMealLog(Long userId, MealLogCreateRequest request) {
-        log.info("식사 기록 등록 시작: userId={}, foodId={}", userId, request.getFoodId());
+        log.info("식사 기록 등록 시작: userId={}, foodId={}, eatenAmountGram={}",
+                userId, request.getFoodId(), request.getEatenAmountGram());
 
         User user = findUserById(userId);
         Food food = foodRepository.findByIdWithNutrition(request.getFoodId())
                 .orElseThrow(() -> new CustomException(ErrorCode.FOOD_NOT_FOUND));
         LocalDateTime eatenAt = toTodayKstDateTime(request.getEatenTime());
 
-        MealLog mealLog = MealLog.withFood(user, food, request.getMealTime(), eatenAt);
+        MealLog mealLog = MealLog.withFood(
+                user,
+                food,
+                request.getMealTime(),
+                eatenAt,
+                request.getEatenAmountGram()
+        );
 
         MealLog saved = mealLogRepository.save(mealLog);
         log.info("식사 기록 등록 완료: mealLogId={}", saved.getId());

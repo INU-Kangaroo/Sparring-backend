@@ -1,11 +1,11 @@
-package com.kangaroo.sparring.domain.recommendation.type;
+package com.kangaroo.sparring.domain.exercise.type;
 
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 
 @Getter
 @RequiredArgsConstructor
-public enum ExerciseIntensity {
+public enum ExerciseIntensityLevel {
     LOW("저강도"),
     MEDIUM("중강도"),
     HIGH("고강도");

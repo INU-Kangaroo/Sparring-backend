@@ -1,5 +1,7 @@
 package com.kangaroo.sparring.domain.recommendation.service;
 
+import com.kangaroo.sparring.domain.exercise.catalog.service.ExerciseCandidateService;
+import com.kangaroo.sparring.domain.exercise.catalog.entity.Exercise;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kangaroo.sparring.domain.healthprofile.entity.HealthProfile;
@@ -48,6 +50,7 @@ public class ExerciseRecommendationService {
     private final RecommendationContextService recommendationContextService;
     private final RecommendationJsonMappingSupport jsonMappingSupport;
     private final RecommendationParsingSupport parsingSupport;
+    private final ExerciseCandidateService exerciseCandidateService;
 
     public ExerciseRecommendationResponse getExerciseRecommendations(Long userId, ExerciseRecommendationRequest request) {
         User user = recommendationContextService.getUser(userId);
@@ -78,7 +81,13 @@ public class ExerciseRecommendationService {
         List<BloodPressureLog> recentBloodPressures =
                 recommendationContextService.getRecentBloodPressures(user.getId(), RECENT_MEASUREMENT_COUNT);
 
-        String prompt = buildExercisePrompt(healthProfile, recentBloodSugars, recentBloodPressures, request);
+        // 마스터 테이블 필터링으로 후보 생성
+        List<Exercise> candidates = exerciseCandidateService.findCandidates(
+                healthProfile, recentBloodPressures, request.getIntensity(), request.getLocation()
+        );
+        String candidatesText = exerciseCandidateService.buildCandidatesText(candidates);
+
+        String prompt = buildExercisePrompt(healthProfile, recentBloodSugars, recentBloodPressures, request, candidatesText);
         String geminiResponse = geminiApiClient.generateContent(prompt);
         ExerciseRecommendationResponse response = parseExerciseResponse(geminiResponse);
 
@@ -100,13 +109,15 @@ public class ExerciseRecommendationService {
     private String buildExercisePrompt(HealthProfile healthProfile,
                                        List<BloodSugarLog> bloodSugars,
                                        List<BloodPressureLog> bloodPressures,
-                                       ExerciseRecommendationRequest request) {
+                                       ExerciseRecommendationRequest request,
+                                       String candidatesText) {
         String userHealthInfo = RecommendationPromptSupport.buildUserHealthInfo(healthProfile, bloodSugars, bloodPressures);
         return promptTemplateService.renderExercisePrompt(Map.of(
                 "USER_HEALTH_INFO", userHealthInfo,
                 "DURATION", request.getDuration().getDescription(),
                 "INTENSITY", request.getIntensity().getDescription(),
-                "LOCATION", request.getLocation().getDescription()
+                "LOCATION", request.getLocation().getDescription(),
+                "EXERCISE_CANDIDATES", candidatesText
         ));
     }
 

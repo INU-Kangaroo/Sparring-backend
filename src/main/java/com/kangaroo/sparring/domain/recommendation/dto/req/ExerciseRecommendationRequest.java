@@ -16,7 +16,7 @@ public class ExerciseRecommendationRequest {
     private ExerciseDuration duration;
 
     @NotNull(message = "운동 강도는 필수입니다")
-    @Schema(description = "운동 강도", example = "MODERATE")
+    @Schema(description = "운동 강도", example = "MEDIUM")
     private ExerciseIntensity intensity;
 
     @NotNull(message = "운동 장소는 필수입니다")

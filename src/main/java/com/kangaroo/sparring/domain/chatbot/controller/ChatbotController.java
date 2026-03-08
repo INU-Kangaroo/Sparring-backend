@@ -2,6 +2,7 @@ package com.kangaroo.sparring.domain.chatbot.controller;
 
 import com.kangaroo.sparring.domain.chatbot.dto.req.ChatMessageRequest;
 import com.kangaroo.sparring.domain.chatbot.dto.req.CreateSessionRequest;
+import com.kangaroo.sparring.domain.chatbot.dto.res.ChatSessionListItemResponse;
 import com.kangaroo.sparring.domain.chatbot.dto.res.ChatSessionResponse;
 import com.kangaroo.sparring.domain.chatbot.service.ChatbotService;
 import com.kangaroo.sparring.global.response.MessageResponse;
@@ -43,7 +44,7 @@ public class ChatbotController {
 
     @Operation(summary = "세션 목록 조회", description = "사용자의 모든 챗봇 대화 세션 목록을 최신순으로 조회합니다.")
     @GetMapping("/sessions")
-    public ResponseEntity<List<ChatSessionResponse>> listSessions(
+    public ResponseEntity<List<ChatSessionListItemResponse>> listSessions(
             @AuthenticationPrincipal UserIdPrincipal principal
     ) {
         Long userId = PrincipalResolver.resolveUserId(principal);

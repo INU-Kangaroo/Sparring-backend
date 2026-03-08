@@ -2,6 +2,7 @@ package com.kangaroo.sparring.domain.chatbot.service;
 
 import com.kangaroo.sparring.domain.chatbot.dto.req.ChatMessageRequest;
 import com.kangaroo.sparring.domain.chatbot.dto.req.CreateSessionRequest;
+import com.kangaroo.sparring.domain.chatbot.dto.res.ChatSessionListItemResponse;
 import com.kangaroo.sparring.domain.chatbot.dto.res.ChatSessionResponse;
 import com.kangaroo.sparring.domain.chatbot.session.ChatMessage;
 import com.kangaroo.sparring.domain.chatbot.session.ChatSession;
@@ -67,10 +68,10 @@ public class ChatbotService {
         return ChatSessionResponse.from(findSessionOrThrow(userId, sessionId));
     }
 
-    public List<ChatSessionResponse> listSessions(Long userId) {
+    public List<ChatSessionListItemResponse> listSessions(Long userId) {
         return sessionRepository.findAllByUserId(userId)
                 .stream()
-                .map(ChatSessionResponse::from)
+                .map(ChatSessionListItemResponse::from)
                 .toList();
     }
 

@@ -1,8 +1,8 @@
 package com.kangaroo.sparring.domain.meal.entity;
 
 import com.kangaroo.sparring.domain.common.BaseEntity;
-import com.kangaroo.sparring.domain.food.entity.Food;
-import com.kangaroo.sparring.domain.food.entity.MealNutrition;
+import com.kangaroo.sparring.domain.food.catalog.entity.Food;
+import com.kangaroo.sparring.domain.food.catalog.entity.MealNutrition;
 import com.kangaroo.sparring.domain.meal.type.MealTime;
 import com.kangaroo.sparring.domain.user.entity.User;
 import jakarta.persistence.*;

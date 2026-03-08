@@ -63,6 +63,13 @@ public interface BloodPressureLogRepository extends JpaRepository<BloodPressureL
             @Param("endDate") LocalDateTime endDate
     );
 
+    // 보고서용: userId + 기간 조회
+    List<BloodPressureLog> findByUserIdAndMeasuredAtBetweenAndIsDeletedFalse(
+            Long userId,
+            LocalDateTime startDateTime,
+            LocalDateTime endDateTime
+    );
+
     interface MonthlyBloodPressureStats {
         Integer getMonth();
         Double getAvgSystolic();

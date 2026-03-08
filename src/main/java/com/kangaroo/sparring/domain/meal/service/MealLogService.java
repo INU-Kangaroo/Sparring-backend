@@ -1,7 +1,7 @@
 package com.kangaroo.sparring.domain.meal.service;
 
-import com.kangaroo.sparring.domain.food.entity.Food;
-import com.kangaroo.sparring.domain.food.repository.FoodRepository;
+import com.kangaroo.sparring.domain.food.catalog.entity.Food;
+import com.kangaroo.sparring.domain.food.catalog.repository.FoodRepository;
 import com.kangaroo.sparring.domain.meal.dto.req.MealLogCreateRequest;
 import com.kangaroo.sparring.domain.meal.dto.res.MealLogResponse;
 import com.kangaroo.sparring.domain.meal.entity.MealLog;

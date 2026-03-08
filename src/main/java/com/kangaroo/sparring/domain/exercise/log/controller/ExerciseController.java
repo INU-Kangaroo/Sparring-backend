@@ -22,7 +22,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 @Tag(name = "운동", description = "운동 기록 API")
-@RestController
+@RestController("exerciseLogController")
 @RequestMapping("/api/exercises")
 @RequiredArgsConstructor
 @Slf4j

@@ -34,10 +34,9 @@ import java.util.stream.Collectors;
 @Transactional(readOnly = true)
 @Slf4j
 public class FoodService {
-    private static final int DEFAULT_SEARCH_LIMIT = 20;
-    private static final int MAX_SEARCH_LIMIT = 50;
+    private static final int DEFAULT_SEARCH_SIZE = 20;
+    private static final int MAX_SEARCH_SIZE = 50;
     private static final int DEFAULT_SEARCH_PAGE = 0;
-    private static final int MAX_SEARCH_PAGE = 1000;
     private static final int EXACT_CANDIDATE_LIMIT = 30;
     private static final int PREFIX_CANDIDATE_LIMIT = 150;
     private static final int CONTAINS_CANDIDATE_LIMIT_PER_TERM = 250;
@@ -61,16 +60,16 @@ public class FoodService {
      * 음식 검색
      * DB에서 음식명으로 검색
      */
-    public List<FoodResponse> searchFood(String keyword, Integer limit, Integer page) {
+    public List<FoodResponse> searchFood(String keyword, Integer size, Integer page) {
         String normalizedKeyword = normalizeRequiredText(keyword);
-        int validatedLimit = validateLimit(limit);
+        int validatedSize = validateSize(size);
         int validatedPage = validatePage(page);
-        long offset = (long) validatedPage * validatedLimit;
+        long offset = (long) validatedPage * validatedSize;
         Set<String> searchTerms = buildSearchTerms(normalizedKeyword);
         log.info(
-                "음식 검색 시작: keyword={}, limit={}, page={}, terms={}",
+                "음식 검색 시작: keyword={}, size={}, page={}, terms={}",
                 normalizedKeyword,
-                validatedLimit,
+                validatedSize,
                 validatedPage,
                 searchTerms.size()
         );
@@ -102,7 +101,7 @@ public class FoodService {
                         .reversed()
                         .thenComparing(Food::getName, String.CASE_INSENSITIVE_ORDER))
                 .skip(offset)
-                .limit(validatedLimit)
+                .limit(validatedSize)
                 .map(FoodResponse::from)
                 .collect(Collectors.toList());
     }
@@ -192,21 +191,21 @@ public class FoodService {
         }
     }
 
-    private int validateLimit(Integer limit) {
-        if (limit == null) {
-            return DEFAULT_SEARCH_LIMIT;
+    private int validateSize(Integer size) {
+        if (size == null) {
+            return DEFAULT_SEARCH_SIZE;
         }
-        if (limit <= 0 || limit > MAX_SEARCH_LIMIT) {
+        if (size <= 0 || size > MAX_SEARCH_SIZE) {
             throw new CustomException(ErrorCode.INVALID_INPUT);
         }
-        return limit;
+        return size;
     }
 
     private int validatePage(Integer page) {
         if (page == null) {
             return DEFAULT_SEARCH_PAGE;
         }
-        if (page < 0 || page > MAX_SEARCH_PAGE) {
+        if (page < 0) {
             throw new CustomException(ErrorCode.INVALID_INPUT);
         }
         return page;

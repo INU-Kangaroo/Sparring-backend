@@ -28,12 +28,12 @@ public class FoodController {
     public ResponseEntity<List<FoodResponse>> searchFood(
             @Parameter(description = "검색 키워드", example = "닭가슴살")
             @RequestParam String keyword,
-            @Parameter(description = "최대 조회 개수 (1~50)", example = "20")
-            @RequestParam(required = false) Integer limit,
+            @Parameter(description = "페이지 크기 (1~50)", example = "20")
+            @RequestParam(required = false) Integer size,
             @Parameter(description = "페이지 번호 (0부터 시작)", example = "0")
             @RequestParam(required = false) Integer page
     ) {
-        List<FoodResponse> foods = foodService.searchFood(keyword, limit, page);
+        List<FoodResponse> foods = foodService.searchFood(keyword, size, page);
         return ResponseEntity.ok(foods);
     }
 

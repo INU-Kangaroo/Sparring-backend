@@ -19,7 +19,7 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.stream.Collectors;
 
-@Service
+@Service("exerciseCatalogCandidateService")
 @Transactional(readOnly = true)
 @RequiredArgsConstructor
 public class ExerciseCandidateService {

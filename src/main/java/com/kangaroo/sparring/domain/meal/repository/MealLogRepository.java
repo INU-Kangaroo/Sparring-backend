@@ -19,4 +19,11 @@ public interface MealLogRepository extends JpaRepository<MealLog, Long> {
     );
 
     Optional<MealLog> findByIdAndIsDeletedFalse(Long id);
+
+    // 보고서용: userId + 기간 조회
+    List<MealLog> findByUserIdAndEatenAtBetweenAndIsDeletedFalse(
+            Long userId,
+            LocalDateTime start,
+            LocalDateTime end
+    );
 }

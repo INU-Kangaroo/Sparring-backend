@@ -18,4 +18,10 @@ public interface ExerciseLogRepository extends JpaRepository<ExerciseLog, Long> 
             LocalDateTime from,
             LocalDateTime to
     );
+
+    List<ExerciseLog> findByUserIdAndLoggedAtBetweenAndIsDeletedFalse(
+            Long userId,
+            LocalDateTime from,
+            LocalDateTime to
+    );
 }

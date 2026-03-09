@@ -18,5 +18,11 @@ public interface FoodLogRepository extends JpaRepository<FoodLog, Long> {
             LocalDateTime end
     );
 
+    List<FoodLog> findByUserIdAndEatenAtBetweenAndIsDeletedFalse(
+            Long userId,
+            LocalDateTime start,
+            LocalDateTime end
+    );
+
     Optional<FoodLog> findByIdAndIsDeletedFalse(Long id);
 }

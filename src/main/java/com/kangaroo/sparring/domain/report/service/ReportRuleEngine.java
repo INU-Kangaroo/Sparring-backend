@@ -1,7 +1,7 @@
 package com.kangaroo.sparring.domain.report.service;
 
 import com.kangaroo.sparring.domain.exercise.log.entity.ExerciseLog;
-import com.kangaroo.sparring.domain.meal.entity.MealLog;
+import com.kangaroo.sparring.domain.food.log.entity.FoodLog;
 import com.kangaroo.sparring.domain.measurement.entity.BloodPressureLog;
 import com.kangaroo.sparring.domain.measurement.entity.BloodSugarLog;
 import com.kangaroo.sparring.domain.report.dto.internal.CommentEvidence;
@@ -30,7 +30,7 @@ public class ReportRuleEngine {
             LocalDate monday,
             List<BloodSugarLog> bsLogs,
             List<BloodPressureLog> bpLogs,
-            List<MealLog> mealLogs,
+            List<FoodLog> mealLogs,
             List<ExerciseLog> exerciseLogs
     ) {
         ReportRuleSupport.BloodSugarStats bs = reportRuleSupport.calcBloodSugarStats(bsLogs);
@@ -80,7 +80,7 @@ public class ReportRuleEngine {
     private int calcRecordDays(
             List<BloodSugarLog> bs,
             List<BloodPressureLog> bp,
-            List<MealLog> meal,
+            List<FoodLog> meal,
             List<ExerciseLog> exercise,
             LocalDate monday
     ) {

@@ -5,6 +5,7 @@ import com.kangaroo.sparring.domain.measurement.dto.res.BloodPressureLogResponse
 import com.kangaroo.sparring.domain.measurement.dto.res.BloodPressurePredictionResponse;
 import com.kangaroo.sparring.domain.measurement.dto.res.MonthlyBloodPressureResponse;
 import com.kangaroo.sparring.domain.measurement.service.BloodPressureService;
+import com.kangaroo.sparring.domain.measurement.support.MeasurementValidationSupport;
 import com.kangaroo.sparring.global.security.principal.PrincipalResolver;
 import com.kangaroo.sparring.global.security.principal.UserIdPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
@@ -20,8 +21,6 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.util.List;
 
 @Tag(name = "혈압 측정", description = "혈압 측정 및 예측 관리 API")
@@ -56,15 +55,14 @@ public class BloodPressureController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate
     ) {
         Long userId = PrincipalResolver.resolveUserId(principal);
-
-        LocalDateTime startDateTime = startDate.atStartOfDay();
-        LocalDateTime endDateTime = endDate.atTime(LocalTime.MAX);
+        MeasurementValidationSupport.DateTimeRange range =
+                MeasurementValidationSupport.toDateTimeRange(startDate, endDate);
 
         log.info("혈압 측정 기록 조회 API 호출: userId={}, startDate={}, endDate={}",
-                userId, startDateTime, endDateTime);
+                userId, range.start(), range.end());
 
         List<BloodPressureLogResponse> responses =
-                bloodPressureService.getBloodPressureLogs(userId, startDateTime, endDateTime);
+                bloodPressureService.getBloodPressureLogs(userId, range.start(), range.end());
         return ResponseEntity.ok(responses);
     }
 

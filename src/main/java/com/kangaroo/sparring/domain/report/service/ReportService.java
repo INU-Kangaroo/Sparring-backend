@@ -2,8 +2,8 @@ package com.kangaroo.sparring.domain.report.service;
 
 import com.kangaroo.sparring.domain.exercise.log.entity.ExerciseLog;
 import com.kangaroo.sparring.domain.exercise.log.repository.ExerciseLogRepository;
-import com.kangaroo.sparring.domain.meal.entity.MealLog;
-import com.kangaroo.sparring.domain.meal.repository.MealLogRepository;
+import com.kangaroo.sparring.domain.food.log.entity.FoodLog;
+import com.kangaroo.sparring.domain.food.log.repository.FoodLogRepository;
 import com.kangaroo.sparring.domain.measurement.entity.BloodPressureLog;
 import com.kangaroo.sparring.domain.measurement.entity.BloodSugarLog;
 import com.kangaroo.sparring.domain.measurement.repository.BloodPressureLogRepository;
@@ -49,7 +49,7 @@ public class ReportService {
     private final UserRepository userRepository;
     private final BloodSugarLogRepository bloodSugarLogRepository;
     private final BloodPressureLogRepository bloodPressureLogRepository;
-    private final MealLogRepository mealLogRepository;
+    private final FoodLogRepository foodLogRepository;
     private final ExerciseLogRepository exerciseLogRepository;
     private final ReportGeminiService reportGeminiService;
     private final ReportRuleEngine reportRuleEngine;
@@ -183,7 +183,7 @@ public class ReportService {
                         userId, startDt, endDt);
         List<BloodPressureLog> bpLogs = bloodPressureLogRepository
                 .findByUserIdAndMeasuredAtBetweenAndIsDeletedFalse(userId, startDt, endDt);
-        List<MealLog> mealLogs = mealLogRepository
+        List<FoodLog> mealLogs = foodLogRepository
                 .findByUserIdAndEatenAtBetweenAndIsDeletedFalse(userId, startDt, endDt);
         List<ExerciseLog> exerciseLogs = exerciseLogRepository
                 .findByUserIdAndLoggedAtBetweenAndIsDeletedFalse(userId, startDt, endDt);
@@ -255,7 +255,7 @@ public class ReportService {
     private record WeeklyLogs(
             List<BloodSugarLog> bloodSugarLogs,
             List<BloodPressureLog> bloodPressureLogs,
-            List<MealLog> mealLogs,
+            List<FoodLog> mealLogs,
             List<ExerciseLog> exerciseLogs
     ) {
     }

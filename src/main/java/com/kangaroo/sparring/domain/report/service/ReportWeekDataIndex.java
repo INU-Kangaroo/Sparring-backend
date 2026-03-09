@@ -1,7 +1,7 @@
 package com.kangaroo.sparring.domain.report.service;
 
 import com.kangaroo.sparring.domain.exercise.log.entity.ExerciseLog;
-import com.kangaroo.sparring.domain.meal.entity.MealLog;
+import com.kangaroo.sparring.domain.food.log.entity.FoodLog;
 import com.kangaroo.sparring.domain.measurement.entity.BloodPressureLog;
 import com.kangaroo.sparring.domain.measurement.entity.BloodSugarLog;
 
@@ -13,13 +13,13 @@ import java.util.stream.Collectors;
 record ReportWeekDataIndex(
         Map<LocalDate, List<BloodSugarLog>> bloodSugarByDate,
         Map<LocalDate, List<BloodPressureLog>> bloodPressureByDate,
-        Map<LocalDate, List<MealLog>> mealByDate,
+        Map<LocalDate, List<FoodLog>> mealByDate,
         Map<LocalDate, List<ExerciseLog>> exerciseByDate
 ) {
     static ReportWeekDataIndex from(
             List<BloodSugarLog> bsLogs,
             List<BloodPressureLog> bpLogs,
-            List<MealLog> mealLogs,
+            List<FoodLog> mealLogs,
             List<ExerciseLog> exerciseLogs
     ) {
         return new ReportWeekDataIndex(

@@ -4,6 +4,7 @@ import com.kangaroo.sparring.domain.measurement.dto.req.BloodPressureLogCreateRe
 import com.kangaroo.sparring.domain.measurement.dto.res.BloodPressureLogResponse;
 import com.kangaroo.sparring.domain.measurement.dto.res.BloodPressurePredictionResponse;
 import com.kangaroo.sparring.domain.measurement.dto.res.MonthlyBloodPressureResponse;
+import com.kangaroo.sparring.domain.common.health.HealthThresholds;
 import com.kangaroo.sparring.domain.measurement.entity.BloodPressureLog;
 import com.kangaroo.sparring.domain.measurement.entity.BloodPressurePrediction;
 import com.kangaroo.sparring.domain.measurement.repository.BloodPressureLogRepository;
@@ -106,18 +107,11 @@ public class BloodPressureService {
 
     public List<BloodPressureLogResponse> getBloodPressureLogsByDate(Long userId, LocalDate date) {
         log.info("일별 혈압 측정 기록 조회: userId={}, date={}", userId, date);
-
-        if (date == null) {
-            throw new CustomException(ErrorCode.INVALID_DATE_RANGE);
-        }
-
-        LocalDateTime startDateTime = date.atStartOfDay();
-        LocalDateTime endDateTime = date.atTime(LocalTime.MAX);
-        MeasurementValidationSupport.validateDateRange(startDateTime, endDateTime);
+        MeasurementValidationSupport.DateTimeRange range = MeasurementValidationSupport.toDateTimeRange(date);
 
         List<BloodPressureLog> logs = bloodPressureLogRepository
                 .findByUserIdAndMeasuredAtBetweenAndIsDeletedFalseOrderByMeasuredAtAsc(
-                        userId, startDateTime, endDateTime);
+                        userId, range.start(), range.end());
 
         return logs.stream()
                 .map(BloodPressureLogResponse::from)
@@ -129,18 +123,12 @@ public class BloodPressureService {
                                                                              LocalDate endDate) {
         log.info("혈압 예측 조회: userId={}, startDate={}, endDate={}", userId, startDate, endDate);
 
-        if (startDate == null || endDate == null) {
-            throw new CustomException(ErrorCode.INVALID_DATE_RANGE);
-        }
-
-        LocalDateTime startDateTime = startDate.atStartOfDay();
-        LocalDateTime endDateTime = endDate.atTime(LocalTime.MAX);
-
-        MeasurementValidationSupport.validateDateRange(startDateTime, endDateTime);
+        MeasurementValidationSupport.DateTimeRange range =
+                MeasurementValidationSupport.toDateTimeRange(startDate, endDate);
 
         List<BloodPressurePrediction> predictions = bloodPressurePredictionRepository
                 .findByUserIdAndTargetDatetimeBetweenAndIsDeletedFalseOrderByTargetDatetimeAsc(
-                        userId, startDateTime, endDateTime);
+                        userId, range.start(), range.end());
 
         if (predictions.isEmpty()) {
             log.warn("혈압 예측 데이터 없음: userId={}", userId);
@@ -222,12 +210,14 @@ public class BloodPressureService {
         Integer heartRate = request.getHeartRate();
 
         // 수축기 혈압 범위 검증
-        if (systolic < 50 || systolic > 300) {
+        if (systolic < HealthThresholds.BLOOD_PRESSURE_SYSTOLIC_MIN
+                || systolic > HealthThresholds.BLOOD_PRESSURE_SYSTOLIC_MAX) {
             throw new CustomException(ErrorCode.INVALID_SYSTOLIC_PRESSURE);
         }
 
         // 이완기 혈압 범위 검증
-        if (diastolic < 30 || diastolic > 200) {
+        if (diastolic < HealthThresholds.BLOOD_PRESSURE_DIASTOLIC_MIN
+                || diastolic > HealthThresholds.BLOOD_PRESSURE_DIASTOLIC_MAX) {
             throw new CustomException(ErrorCode.INVALID_DIASTOLIC_PRESSURE);
         }
 
@@ -237,7 +227,9 @@ public class BloodPressureService {
         }
 
         // 심박수 범위 검증 (optional이므로 null 체크)
-        if (heartRate != null && (heartRate < 30 || heartRate > 250)) {
+        if (heartRate != null
+                && (heartRate < HealthThresholds.HEART_RATE_MIN
+                || heartRate > HealthThresholds.HEART_RATE_MAX)) {
             throw new CustomException(ErrorCode.INVALID_HEART_RATE);
         }
     }

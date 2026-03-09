@@ -4,6 +4,7 @@ import com.kangaroo.sparring.domain.measurement.dto.req.BloodSugarLogCreateReque
 import com.kangaroo.sparring.domain.measurement.dto.res.BloodSugarLogResponse;
 import com.kangaroo.sparring.domain.measurement.dto.res.BloodSugarPredictionResponse;
 import com.kangaroo.sparring.domain.measurement.dto.res.MonthlyBloodSugarResponse;
+import com.kangaroo.sparring.domain.common.health.HealthThresholds;
 import com.kangaroo.sparring.domain.measurement.entity.BloodSugarLog;
 import com.kangaroo.sparring.domain.measurement.entity.BloodSugarPrediction;
 import com.kangaroo.sparring.domain.measurement.repository.BloodSugarLogRepository;
@@ -101,18 +102,11 @@ public class BloodSugarService {
 
     public List<BloodSugarLogResponse> getBloodSugarLogsByDate(Long userId, LocalDate date) {
         log.info("일별 혈당 측정 기록 조회: userId={}, date={}", userId, date);
-
-        if (date == null) {
-            throw new CustomException(ErrorCode.INVALID_DATE_RANGE);
-        }
-
-        LocalDateTime startDateTime = date.atStartOfDay();
-        LocalDateTime endDateTime = date.atTime(LocalTime.MAX);
-        MeasurementValidationSupport.validateDateRange(startDateTime, endDateTime);
+        MeasurementValidationSupport.DateTimeRange range = MeasurementValidationSupport.toDateTimeRange(date);
 
         List<BloodSugarLog> logs = bloodSugarLogRepository
                 .findByUserIdAndMeasurementTimeBetweenAndIsDeletedFalseOrderByMeasurementTimeAsc(
-                        userId, startDateTime, endDateTime);
+                        userId, range.start(), range.end());
 
         return logs.stream()
                 .map(BloodSugarLogResponse::from)
@@ -123,14 +117,7 @@ public class BloodSugarService {
                                                                        LocalDate startDate,
                                                                        LocalDate endDate) {
         log.info("혈당 예측 조회: userId={}, startDate={}, endDate={}", userId, startDate, endDate);
-
-        if (startDate == null || endDate == null) {
-            throw new CustomException(ErrorCode.INVALID_DATE_RANGE);
-        }
-
-        LocalDateTime startDateTime = startDate.atStartOfDay();
-        LocalDateTime endDateTime = endDate.atTime(LocalTime.MAX);
-        MeasurementValidationSupport.validateDateRange(startDateTime, endDateTime);
+        MeasurementValidationSupport.toDateTimeRange(startDate, endDate);
 
         List<BloodSugarPrediction> predictions =
                 bloodSugarPredictionRepository.findByUserIdAndDateRange(userId, startDate, endDate);
@@ -205,7 +192,9 @@ public class BloodSugarService {
      * 혈당 수치 검증
      */
     private void validateGlucoseLevel(Integer glucoseLevel) {
-        if (glucoseLevel == null || glucoseLevel < 20 || glucoseLevel > 600) {
+        if (glucoseLevel == null
+                || glucoseLevel < HealthThresholds.BLOOD_SUGAR_MIN
+                || glucoseLevel > HealthThresholds.BLOOD_SUGAR_MAX) {
             throw new CustomException(ErrorCode.INVALID_GLUCOSE_LEVEL);
         }
     }

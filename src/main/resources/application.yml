@@ -125,3 +125,24 @@ gemini:
 ml:
   server:
     url: ${ML_SERVER_URL}
+
+# Report Scoring Policy
+report:
+  policy:
+    blood-sugar-weekly-target: 21
+    blood-pressure-weekly-target: 14
+    exercise-active-days-target: 5
+    full-meal-days-target: 7
+    severe-high-blood-sugar: 180
+    severe-high-systolic: 160
+    severe-high-diastolic: 100
+    severe-risk-penalty: 30.0
+    variability-penalty-factor: 120.0
+    blood-sugar-trend-slope-factor: 4.0
+    systolic-trend-slope-factor: 5.0
+    diastolic-trend-slope-factor: 7.0
+    overall-health-weight: 0.35
+    overall-consistency-weight: 0.20
+    overall-stability-weight: 0.15
+    overall-trend-weight: 0.10
+    overall-lifestyle-weight: 0.20

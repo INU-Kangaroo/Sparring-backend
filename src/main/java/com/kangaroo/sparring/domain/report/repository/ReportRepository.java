@@ -9,7 +9,6 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
-import java.util.List;
 import java.util.Optional;
 
 @Repository
@@ -35,6 +34,20 @@ public interface ReportRepository extends JpaRepository<Report, Long> {
             @Param("userId") Long userId,
             @Param("year") Integer year,
             @Param("month") Integer month,
+            Pageable pageable
+    );
+
+    @Query("""
+            SELECT r
+            FROM Report r
+            WHERE r.user.id = :userId
+              AND r.isDeleted = false
+              AND r.startDate BETWEEN :startDate AND :endDate
+            """)
+    Page<Report> findPageByUserIdAndStartDateBetween(
+            @Param("userId") Long userId,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate,
             Pageable pageable
     );
 

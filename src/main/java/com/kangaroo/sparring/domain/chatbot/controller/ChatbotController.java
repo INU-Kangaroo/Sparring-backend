@@ -42,13 +42,14 @@ public class ChatbotController {
         return ResponseEntity.status(HttpStatus.CREATED).body(chatbotService.createSession(userId, req));
     }
 
-    @Operation(summary = "세션 목록 조회", description = "사용자의 모든 챗봇 대화 세션 목록을 최신순으로 조회합니다.")
+    @Operation(summary = "세션 목록 조회", description = "사용자의 챗봇 대화 세션 목록을 최신순으로 조회합니다.")
     @GetMapping("/sessions")
     public ResponseEntity<List<ChatSessionListItemResponse>> listSessions(
-            @AuthenticationPrincipal UserIdPrincipal principal
+            @AuthenticationPrincipal UserIdPrincipal principal,
+            @RequestParam(required = false) Integer limit
     ) {
         Long userId = PrincipalResolver.resolveUserId(principal);
-        return ResponseEntity.ok(chatbotService.listSessions(userId));
+        return ResponseEntity.ok(chatbotService.listSessions(userId, limit));
     }
 
     @Operation(summary = "세션 상세 조회", description = "특정 세션의 전체 대화 내용을 조회합니다.")

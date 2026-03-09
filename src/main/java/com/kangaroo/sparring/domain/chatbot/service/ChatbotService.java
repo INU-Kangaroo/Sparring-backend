@@ -38,6 +38,8 @@ import java.util.concurrent.atomic.AtomicReference;
 @Service
 @RequiredArgsConstructor
 public class ChatbotService {
+    public static final int DEFAULT_SESSION_LIST_LIMIT = 30;
+    public static final int MAX_SESSION_LIST_LIMIT = 100;
 
     private final ChatSessionRepository sessionRepository;
     private final GeminiStreamingClient geminiStreamingClient;
@@ -68,8 +70,9 @@ public class ChatbotService {
         return ChatSessionResponse.from(findSessionOrThrow(userId, sessionId));
     }
 
-    public List<ChatSessionListItemResponse> listSessions(Long userId) {
-        return sessionRepository.findAllByUserId(userId)
+    public List<ChatSessionListItemResponse> listSessions(Long userId, Integer limit) {
+        int validatedLimit = validateSessionListLimit(limit);
+        return sessionRepository.findRecentByUserId(userId, validatedLimit)
                 .stream()
                 .map(ChatSessionListItemResponse::from)
                 .toList();
@@ -216,6 +219,16 @@ public class ChatbotService {
     private ChatSession findSessionOrThrow(Long userId, String sessionId) {
         return sessionRepository.findById(userId, sessionId)
                 .orElseThrow(() -> new CustomException(ErrorCode.CHATBOT_SESSION_NOT_FOUND));
+    }
+
+    private int validateSessionListLimit(Integer limit) {
+        if (limit == null) {
+            return DEFAULT_SESSION_LIST_LIMIT;
+        }
+        if (limit <= 0 || limit > MAX_SESSION_LIST_LIMIT) {
+            throw new CustomException(ErrorCode.INVALID_INPUT);
+        }
+        return limit;
     }
 
     private String buildUserContextSummary(Long userId) {

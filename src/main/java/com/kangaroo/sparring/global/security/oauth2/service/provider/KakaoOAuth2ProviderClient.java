@@ -6,7 +6,11 @@ import com.kangaroo.sparring.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.*;
+import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
@@ -17,6 +21,8 @@ import java.util.Map;
 @Component
 @RequiredArgsConstructor
 public class KakaoOAuth2ProviderClient implements OAuth2ProviderClient {
+    private static final ParameterizedTypeReference<Map<String, Object>> MAP_RESPONSE_TYPE =
+            new ParameterizedTypeReference<>() {};
 
     private final RestTemplate restTemplate;
 
@@ -52,11 +58,11 @@ public class KakaoOAuth2ProviderClient implements OAuth2ProviderClient {
         HttpEntity<Void> entity = new HttpEntity<>(headers);
 
         try {
-            ResponseEntity<Map> response = restTemplate.exchange(
+            ResponseEntity<Map<String, Object>> response = restTemplate.exchange(
                     kakaoUserInfoUri,
                     HttpMethod.POST,
                     entity,
-                    Map.class
+                    MAP_RESPONSE_TYPE
             );
             return response.getBody();
         } catch (HttpClientErrorException ex) {
@@ -78,11 +84,11 @@ public class KakaoOAuth2ProviderClient implements OAuth2ProviderClient {
         HttpEntity<Void> entity = new HttpEntity<>(headers);
 
         try {
-            ResponseEntity<Map> response = restTemplate.exchange(
+            ResponseEntity<Map<String, Object>> response = restTemplate.exchange(
                     kakaoAccessTokenInfoUri,
                     HttpMethod.GET,
                     entity,
-                    Map.class
+                    MAP_RESPONSE_TYPE
             );
             Map<String, Object> body = response.getBody();
             if (body == null || !kakaoAppId.equals(String.valueOf(body.get("app_id")))) {

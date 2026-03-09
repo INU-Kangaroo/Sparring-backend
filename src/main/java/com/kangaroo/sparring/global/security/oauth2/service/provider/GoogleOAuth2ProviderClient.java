@@ -6,7 +6,12 @@ import com.kangaroo.sparring.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.*;
+import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
@@ -21,6 +26,8 @@ import java.util.Map;
 @Component
 @RequiredArgsConstructor
 public class GoogleOAuth2ProviderClient implements OAuth2ProviderClient {
+    private static final ParameterizedTypeReference<Map<String, Object>> MAP_RESPONSE_TYPE =
+            new ParameterizedTypeReference<>() {};
 
     private final RestTemplate restTemplate;
 
@@ -74,11 +81,11 @@ public class GoogleOAuth2ProviderClient implements OAuth2ProviderClient {
         HttpEntity<Void> entity = new HttpEntity<>(headers);
 
         try {
-            ResponseEntity<Map> response = restTemplate.exchange(
+            ResponseEntity<Map<String, Object>> response = restTemplate.exchange(
                     googleUserInfoUri,
                     HttpMethod.GET,
                     entity,
-                    Map.class
+                    MAP_RESPONSE_TYPE
             );
             return response.getBody();
         } catch (HttpClientErrorException ex) {
@@ -105,11 +112,11 @@ public class GoogleOAuth2ProviderClient implements OAuth2ProviderClient {
         HttpEntity<MultiValueMap<String, String>> entity = new HttpEntity<>(params, headers);
 
         try {
-            ResponseEntity<Map> response = restTemplate.exchange(
+            ResponseEntity<Map<String, Object>> response = restTemplate.exchange(
                     googleTokenUri,
                     HttpMethod.POST,
                     entity,
-                    Map.class
+                    MAP_RESPONSE_TYPE
             );
             log.info("OAuth2 token exchange success: provider=google, status={}", response.getStatusCode());
             return response.getBody();
@@ -127,16 +134,16 @@ public class GoogleOAuth2ProviderClient implements OAuth2ProviderClient {
             throw new CustomException(ErrorCode.INVALID_INPUT);
         }
 
-        String url = UriComponentsBuilder.fromHttpUrl(googleTokenInfoUri)
+        String url = UriComponentsBuilder.fromUriString(googleTokenInfoUri)
                 .queryParam("id_token", idToken)
                 .toUriString();
 
         try {
-            ResponseEntity<Map> response = restTemplate.exchange(
+            ResponseEntity<Map<String, Object>> response = restTemplate.exchange(
                     url,
                     HttpMethod.GET,
-                    HttpEntity.EMPTY,
-                    Map.class
+                    null,
+                    MAP_RESPONSE_TYPE
             );
             Map<String, Object> body = response.getBody();
             if (body == null) {

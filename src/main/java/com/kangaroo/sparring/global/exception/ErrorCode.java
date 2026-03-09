@@ -31,6 +31,7 @@ public enum ErrorCode {
     EXPIRED_VERIFICATION_CODE(HttpStatus.BAD_REQUEST, "E003", "만료된 인증코드입니다"),
     VERIFICATION_NOT_FOUND(HttpStatus.BAD_REQUEST, "E004", "인증 요청이 존재하지 않습니다"),
     TOO_MANY_REQUESTS(HttpStatus.TOO_MANY_REQUESTS, "E005", "잠시 후 다시 시도해주세요."),
+    EMAIL_SEND_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "E006", "이메일 발송에 실패했습니다"),
 
     // Survey
     SURVEY_NOT_FOUND(HttpStatus.NOT_FOUND, "S001", "설문을 찾을 수 없습니다"),

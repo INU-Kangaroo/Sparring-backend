@@ -243,7 +243,7 @@ public class EmailService {
 
         } catch (Exception e) {
             log.error("이메일 발송 실패: {}", toEmail, e);
-            throw new RuntimeException("이메일 발송에 실패했습니다.", e);
+            throw new CustomException(ErrorCode.EMAIL_SEND_FAILED);
         }
     }
 }

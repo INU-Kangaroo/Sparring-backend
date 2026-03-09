@@ -10,7 +10,6 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -21,7 +20,7 @@ import java.util.Set;
 public class ChatSessionRepository {
 
     private static final String SESSION_KEY_PREFIX = "chatbot:session:";
-    private static final String USER_SESSIONS_KEY_PREFIX = "chatbot:sessions:";
+    private static final String USER_SESSIONS_ZSET_KEY_PREFIX = "chatbot:sessions:zset:";
     private static final Duration SESSION_TTL = Duration.ofHours(24);
 
     private final RedisTemplate<String, String> redisTemplate;
@@ -29,12 +28,16 @@ public class ChatSessionRepository {
 
     public void save(ChatSession session) {
         String sessionKey = sessionKey(session.getUserId(), session.getSessionId());
-        String userSetKey = userSetKey(session.getUserId());
+        String userZsetKey = userZsetKey(session.getUserId());
         try {
             String json = objectMapper.writeValueAsString(session);
             redisTemplate.opsForValue().set(sessionKey, json, SESSION_TTL);
-            redisTemplate.opsForSet().add(userSetKey, session.getSessionId());
-            redisTemplate.expire(userSetKey, SESSION_TTL);
+            redisTemplate.opsForZSet().add(
+                    userZsetKey,
+                    session.getSessionId(),
+                    session.getLastActiveAt().atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+            );
+            redisTemplate.expire(userZsetKey, SESSION_TTL);
         } catch (JsonProcessingException e) {
             log.error("채팅 세션 직렬화 실패: sessionId={}", session.getSessionId(), e);
             throw new CustomException(ErrorCode.CHATBOT_SESSION_SERIALIZE_FAILED);
@@ -56,8 +59,15 @@ public class ChatSessionRepository {
     }
 
     public List<ChatSession> findAllByUserId(Long userId) {
-        String userSetKey = userSetKey(userId);
-        Set<String> sessionIds = redisTemplate.opsForSet().members(userSetKey);
+        return findRecentByUserId(userId, Integer.MAX_VALUE);
+    }
+
+    public List<ChatSession> findRecentByUserId(Long userId, int limit) {
+        if (limit <= 0) {
+            return List.of();
+        }
+        String userZsetKey = userZsetKey(userId);
+        Set<String> sessionIds = redisTemplate.opsForZSet().reverseRange(userZsetKey, 0, limit - 1L);
         if (sessionIds == null || sessionIds.isEmpty()) {
             return List.of();
         }
@@ -65,13 +75,12 @@ public class ChatSessionRepository {
                 .map(sid -> findById(userId, sid))
                 .filter(Optional::isPresent)
                 .map(Optional::get)
-                .sorted(Comparator.comparing(ChatSession::getLastActiveAt).reversed())
                 .toList();
     }
 
     public void delete(Long userId, String sessionId) {
         redisTemplate.delete(sessionKey(userId, sessionId));
-        redisTemplate.opsForSet().remove(userSetKey(userId), sessionId);
+        redisTemplate.opsForZSet().remove(userZsetKey(userId), sessionId);
     }
 
     public boolean existsById(Long userId, String sessionId) {
@@ -82,7 +91,7 @@ public class ChatSessionRepository {
         return SESSION_KEY_PREFIX + userId + ":" + sessionId;
     }
 
-    private String userSetKey(Long userId) {
-        return USER_SESSIONS_KEY_PREFIX + userId;
+    private String userZsetKey(Long userId) {
+        return USER_SESSIONS_ZSET_KEY_PREFIX + userId;
     }
 }

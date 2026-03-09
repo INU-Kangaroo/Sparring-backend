@@ -1,4 +1,4 @@
-package com.kangaroo.sparring.global.email;
+package com.kangaroo.sparring.domain.user.service.auth;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;

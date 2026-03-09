@@ -1,7 +1,7 @@
 package com.kangaroo.sparring.global.security.oauth2.user;
 
-import com.kangaroo.sparring.global.security.oauth2.provider.GoogleOAuth2UserInfo;
-import com.kangaroo.sparring.global.security.oauth2.provider.KakaoOAuth2UserInfo;
+import com.kangaroo.sparring.global.security.oauth2.user.provider.GoogleOAuth2UserInfo;
+import com.kangaroo.sparring.global.security.oauth2.user.provider.KakaoOAuth2UserInfo;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 
 import java.util.Map;

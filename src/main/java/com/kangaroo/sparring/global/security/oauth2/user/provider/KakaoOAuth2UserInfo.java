@@ -1,4 +1,4 @@
-package com.kangaroo.sparring.global.security.oauth2.provider;
+package com.kangaroo.sparring.global.security.oauth2.user.provider;
 
 import com.kangaroo.sparring.domain.user.type.Gender;
 import com.kangaroo.sparring.global.security.oauth2.user.OAuth2UserInfo;

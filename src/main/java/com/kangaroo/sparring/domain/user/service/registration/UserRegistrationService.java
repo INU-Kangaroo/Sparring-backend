@@ -6,7 +6,7 @@ import com.kangaroo.sparring.domain.user.dto.req.SignupRequest;
 import com.kangaroo.sparring.domain.user.dto.req.SocialSignupCompleteRequest;
 import com.kangaroo.sparring.domain.user.entity.User;
 import com.kangaroo.sparring.domain.user.repository.UserRepository;
-import com.kangaroo.sparring.global.email.EmailService;
+import com.kangaroo.sparring.domain.user.service.auth.EmailService;
 import com.kangaroo.sparring.global.exception.CustomException;
 import com.kangaroo.sparring.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;

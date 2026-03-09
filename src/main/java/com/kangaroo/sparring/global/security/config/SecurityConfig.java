@@ -1,4 +1,4 @@
-package com.kangaroo.sparring.global.config;
+package com.kangaroo.sparring.global.security.config;
 
 import com.kangaroo.sparring.global.security.jwt.JwtAccessDeniedHandler;
 import com.kangaroo.sparring.global.security.jwt.JwtAuthenticationEntryPoint;

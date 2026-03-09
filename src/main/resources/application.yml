@@ -120,3 +120,8 @@ gemini:
   api:
     key: ${GEMINI_API_KEY}
     url: ${GEMINI_API_URL}
+
+# ML Server Configuration
+ml:
+  server:
+    url: ${ML_SERVER_URL}

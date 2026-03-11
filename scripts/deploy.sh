@@ -1,4 +1,4 @@
-set -e  # 오류 발생 시 즉시 중단
+set -e
 
 DEPLOY_DIR="$HOME/server"
 COMPOSE_FILE="$DEPLOY_DIR/docker-compose-prod.yml"
@@ -12,7 +12,7 @@ echo "  Sparring 배포 시작"
 echo "  TAG: $IMAGE_TAG"
 echo "=============================="
 
-# 배포 디렉토리 생성
+# 배포 디렉토리/compose 파일 확인
 mkdir -p "$DEPLOY_DIR"
 
 if [ ! -f "$COMPOSE_FILE" ]; then
@@ -20,7 +20,6 @@ if [ ! -f "$COMPOSE_FILE" ]; then
   exit 1
 fi
 
-# 필수 환경변수 검증
 REQUIRED_VARS=(
   DB_NAME
   DB_ROOT_PASSWORD
@@ -45,6 +44,7 @@ for var in "${REQUIRED_VARS[@]}"; do
   fi
 done
 
+# 이미지/레포 필수값 확인
 if [ -z "$IMAGE_TAG" ]; then
   echo "ERROR: IMAGE_TAG가 비어 있습니다."
   exit 1
@@ -56,7 +56,7 @@ if [ -z "$GITHUB_REPOSITORY" ]; then
 fi
 GITHUB_REPOSITORY="$(echo "$GITHUB_REPOSITORY" | tr '[:upper:]' '[:lower:]')"
 
-# 롤백용 현재 태그 저장 (실행 중 컨테이너가 있는 경우)
+# 실행 중인 app 이미지 태그를 롤백 후보로 보관
 CURRENT_APP_IMAGE=$(docker ps --filter "name=^/sparring-app$" --format "{{.Image}}" | head -n 1 || true)
 if [ -n "$CURRENT_APP_IMAGE" ]; then
   case "$CURRENT_APP_IMAGE" in
@@ -67,23 +67,20 @@ if [ -n "$CURRENT_APP_IMAGE" ]; then
   esac
 fi
 
-# GHCR 로그인
 echo ">> GHCR 로그인..."
 echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
 
-# 새 이미지 pull
 echo ">> 이미지 pull..."
 docker pull ghcr.io/${GITHUB_REPOSITORY}:${IMAGE_TAG}
 
-# IMAGE_TAG 환경변수 export (compose에서 사용)
+# compose에서 참조할 태그 주입
 export IMAGE_TAG
 export GITHUB_REPOSITORY
 
-# 의존 서비스 먼저 기동 (최초 배포 대응)
+# DB/Redis만 먼저 올리고 healthy 대기
 echo ">> 의존 서비스 기동..."
-docker compose -f "$COMPOSE_FILE" up -d mysql redis nginx
+docker compose -f "$COMPOSE_FILE" up -d mysql redis
 
-# mysql/redis 헬스 상태 대기
 wait_for_health() {
   local service_name="$1"
   local max_retries=24
@@ -106,12 +103,17 @@ wait_for_health() {
 wait_for_health "mysql"
 wait_for_health "redis"
 
-# 앱 컨테이너 무중단 재시작
+# app 교체 후 app 자체 health 확인
 echo ">> 앱 컨테이너 재시작..."
 docker compose -f "$COMPOSE_FILE" up -d --no-deps app
 
-# 헬스체크 (최대 90초 대기)
-# nginx를 통해 actuator/health 확인
+wait_for_health "app"
+
+# app healthy 이후 nginx 기동
+echo ">> nginx 기동..."
+docker compose -f "$COMPOSE_FILE" up -d --no-deps nginx
+
+# 최종 외부 경로(/actuator/health) 확인
 echo ">> 헬스체크 시작..."
 MAX_RETRIES=18
 RETRY_INTERVAL=5
@@ -121,10 +123,14 @@ until curl -sf http://localhost/actuator/health > /dev/null; do
   count=$((count + 1))
   if [ $count -ge $MAX_RETRIES ]; then
     echo "ERROR: 헬스체크 실패"
+    docker compose -f "$COMPOSE_FILE" logs --tail=100 app nginx || true
     if [ -n "$ROLLBACK_TAG" ]; then
+      # 실패 시 이전 태그로 app 롤백 후 동일 검증
       echo ">> 이전 버전으로 롤백 시도: $ROLLBACK_TAG"
       export IMAGE_TAG="$ROLLBACK_TAG"
       docker compose -f "$COMPOSE_FILE" up -d --no-deps app
+      wait_for_health "app"
+      docker compose -f "$COMPOSE_FILE" up -d --no-deps nginx
 
       echo ">> 롤백 후 헬스체크 재확인..."
       rollback_count=0
@@ -132,6 +138,7 @@ until curl -sf http://localhost/actuator/health > /dev/null; do
         rollback_count=$((rollback_count + 1))
         if [ $rollback_count -ge $MAX_RETRIES ]; then
           echo "ERROR: 롤백 후에도 헬스체크 실패"
+          docker compose -f "$COMPOSE_FILE" logs --tail=100 app nginx || true
           exit 1
         fi
         echo "   롤백 대기 중... ($rollback_count/$MAX_RETRIES)"
@@ -149,7 +156,7 @@ done
 
 echo "배포 완료"
 
-# 오래된 이미지 정리
+# 사용하지 않는 dangling 이미지 정리
 echo ">> 이전 이미지 정리..."
 docker image prune -f
 

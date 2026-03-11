@@ -72,7 +72,7 @@ public class MlServerClient {
 
             String responseBody = webClientBuilder.build()
                     .post()
-                    .uri(mlServerUrl + "/predict")
+                    .uri(mlServerUrl + "/predict-glucose")
                     .contentType(MediaType.APPLICATION_JSON)
                     .bodyValue(requestBody.toString())
                     .retrieve()

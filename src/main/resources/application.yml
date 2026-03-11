@@ -1,0 +1,150 @@
+spring:
+  application:
+    name: sparring
+
+  # Database Configuration
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 5
+      connection-timeout: 30000
+
+  # Redis Configuration
+  data:
+    redis:
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT}
+      password: ${REDIS_PASSWORD:}
+
+  # JPA Configuration
+  jpa:
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
+        jdbc:
+          time_zone: Asia/Seoul
+    open-in-view: false
+
+  jackson:
+    time-zone: Asia/Seoul
+
+  # OAuth2 Configuration
+  oauth2:
+    google:
+      client-id: ${GOOGLE_CLIENT_ID}
+      client-secret: ${GOOGLE_CLIENT_SECRET}
+      token-uri: https://oauth2.googleapis.com/token
+      user-info-uri: https://www.googleapis.com/oauth2/v3/userinfo
+      token-info-uri: https://oauth2.googleapis.com/tokeninfo
+      user-name-attribute: sub
+      scope:
+        - profile
+        - email
+    kakao:
+      client-id: ${KAKAO_CLIENT_ID}
+      token-uri: https://kauth.kakao.com/oauth/token
+      user-info-uri: https://kapi.kakao.com/v2/user/me
+      access-token-info-uri: https://kapi.kakao.com/v1/user/access_token_info
+      app-id: ${KAKAO_APP_ID}
+      scope:
+        - profile_nickname
+        - profile_image
+        - account_email
+        - gender
+        - age_range
+        - birthday
+        - birthyear
+
+  # Mail Configuration
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: ${MAIL_USERNAME}
+    password: ${MAIL_PASSWORD}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
+
+# JWT Configuration
+jwt:
+  secret: ${JWT_SECRET}
+  access-token-validity: 3600000    # 1시간
+  refresh-token-validity: 604800000 # 7일
+
+# CORS Configuration
+cors:
+  allowed-origin-patterns:
+    - "*"
+  allow-credentials: false
+
+# Server Configuration
+server:
+  port: 8080
+  servlet:
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
+
+# SpringDoc OpenAPI Configuration
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    enabled: true
+
+# Gemini API Configuration
+gemini:
+  api:
+    key: ${GEMINI_API_KEY}
+    url: ${GEMINI_API_URL}
+
+# ML Server Configuration
+ml:
+  server:
+    url: ${ML_SERVER_URL}
+
+# Report Scoring Policy
+report:
+  policy:
+    blood-sugar-weekly-target: 21
+    blood-pressure-weekly-target: 14
+    exercise-active-days-target: 5
+    full-meal-days-target: 7
+    severe-high-blood-sugar: 180
+    severe-high-systolic: 160
+    severe-high-diastolic: 100
+    severe-risk-penalty: 30.0
+    variability-penalty-factor: 120.0
+    blood-sugar-trend-slope-factor: 4.0
+    systolic-trend-slope-factor: 5.0
+    diastolic-trend-slope-factor: 7.0
+    overall-health-weight: 0.35
+    overall-consistency-weight: 0.20
+    overall-stability-weight: 0.15
+    overall-trend-weight: 0.10
+    overall-lifestyle-weight: 0.20
+
+# Actuator (헬스체크 엔드포인트)
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+  server:
+    port: 8080

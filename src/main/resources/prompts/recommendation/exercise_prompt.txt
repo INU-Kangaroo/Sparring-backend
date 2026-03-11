@@ -1,0 +1,40 @@
+사용자 건강 정보:
+{{USER_HEALTH_INFO}}
+
+운동 조건:
+- 시간: {{DURATION}}
+- 강도: {{INTENSITY}}
+- 장소: {{LOCATION}}
+
+아래는 사용자 조건에 맞게 사전 필터링된 운동 후보 목록입니다:
+{{EXERCISE_CANDIDATES}}
+
+위 후보 중에서 사용자 건강 상태에 가장 적합한 운동을 선택해주세요.
+유산소(AEROBIC) 운동 최대 3개, 근력(STRENGTH) 운동 최대 3개를 선택하세요.
+후보 목록에 없는 운동은 절대 추가하지 마세요.
+
+각 운동에 대해:
+- 유산소 운동: 권장 지속 시간, 예상 칼로리(minCalories/maxCalories 정수), 주의사항
+- 근력 운동: 권장 지속 시간, 권장 빈도(예: 주 3회), 주의사항
+- 주의사항은 완결된 자연스러운 안내 문장으로 1~3개 작성
+
+반드시 아래 JSON 형식으로만 응답해주세요:
+{
+  "cardiacExercises": [
+    {
+      "name": "운동명",
+      "duration": "30분",
+      "minCalories": 200,
+      "maxCalories": 400,
+      "precautions": ["주의사항1", "주의사항2"]
+    }
+  ],
+  "strengthExercises": [
+    {
+      "name": "운동명",
+      "duration": "30분",
+      "frequency": "주 3회",
+      "precautions": ["주의사항1"]
+    }
+  ]
+}

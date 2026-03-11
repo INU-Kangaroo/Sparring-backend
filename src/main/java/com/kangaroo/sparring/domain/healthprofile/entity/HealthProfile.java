@@ -1,0 +1,195 @@
+package com.kangaroo.sparring.domain.healthprofile.entity;
+
+import com.kangaroo.sparring.domain.common.BaseEntity;
+import com.kangaroo.sparring.domain.common.type.ExerciseDuration;
+import com.kangaroo.sparring.domain.user.type.Gender;
+import com.kangaroo.sparring.domain.user.entity.User;
+import com.kangaroo.sparring.domain.healthprofile.support.HealthProfileFieldSupport;
+import com.kangaroo.sparring.domain.survey.type.*;
+import jakarta.persistence.*;
+import lombok.*;
+
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.LocalDate;
+
+@Entity
+@Table(name = "health_profile")
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@AllArgsConstructor
+@Builder
+public class HealthProfile extends BaseEntity {
+
+    @Id
+    @Column(name = "user_id")
+    private Long userId;
+
+    @OneToOne(fetch = FetchType.LAZY)
+    @MapsId
+    @JoinColumn(name = "user_id")
+    private User user;
+
+    // 기본 정보
+    @Column(name = "birth_date")
+    private LocalDate birthDate;
+
+    @Enumerated(EnumType.STRING)
+    @Column(length = 10)
+    private Gender gender;
+
+    @Column(precision = 5, scale = 2)
+    private BigDecimal height;
+
+    @Column(precision = 5, scale = 2)
+    private BigDecimal weight;
+
+    @Column(precision = 4, scale = 2)
+    private BigDecimal bmi;
+
+    // 건강 상태
+    @Enumerated(EnumType.STRING)
+    @Column(name = "blood_sugar_status", length = 20)
+    private BloodSugarStatus bloodSugarStatus;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "blood_pressure_status", length = 20)
+    private BloodPressureStatus bloodPressureStatus;
+
+    @Column(name = "has_family_hypertension")
+    private Boolean hasFamilyHypertension;
+
+    @Column(columnDefinition = "TEXT")
+    private String medications;
+
+    @Column(columnDefinition = "TEXT")
+    private String allergies;
+
+    @Column(name = "health_goal", length = 100)
+    private String healthGoal;
+
+    // 식습관
+    @Enumerated(EnumType.STRING)
+    @Column(name = "meal_frequency", length = 20)
+    private MealFrequency mealFrequency;
+
+    @Column(name = "food_preference", columnDefinition = "JSON")
+    private String foodPreference;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "sugar_intake_freq", length = 30)
+    private SugarIntakeFreq sugarIntakeFreq;
+
+    @Column(name = "caffeine_intake")
+    private Boolean caffeineIntake;
+
+    // 운동 습관
+    @Enumerated(EnumType.STRING)
+    @Column(name = "exercise_frequency", length = 20)
+    private ExerciseFrequency exerciseFrequency;
+
+    @Column(name = "exercise_place", columnDefinition = "JSON")
+    private String exercisePlace;
+
+    @Column(name = "exercise_type", length = 255)
+    private String exerciseType;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "exercise_duration", length = 20)
+    private ExerciseDuration exerciseDuration;
+
+    @Column(name = "avg_steps")
+    private Integer avgSteps;
+
+    // 생활 습관
+    @Column(name = "sleep_hours", precision = 4, scale = 1)
+    private BigDecimal sleepHours;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "sleep_quality", length = 20)
+    private SleepQuality sleepQuality;
+
+    @Column(name = "smoking_status")
+    private Boolean smokingStatus;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "drinking_frequency", length = 30)
+    private DrinkingFrequency drinkingFrequency;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "stress_level", length = 20)
+    private StressLevel stressLevel;
+
+    // BMI 계산 메서드
+    public void calculateBmi() {
+        if (height != null && weight != null && height.compareTo(BigDecimal.ZERO) > 0) {
+            BigDecimal heightInMeters = height.divide(new BigDecimal("100"), 4, RoundingMode.HALF_UP);
+            this.bmi = weight.divide(heightInMeters.multiply(heightInMeters), 2, RoundingMode.HALF_UP);
+        }
+    }
+
+    // 비즈니스 메서드 - 사용자 직접 업데이트 (부분 업데이트)
+    public void updateProfile(
+            LocalDate birthDate, Gender gender, BigDecimal height, BigDecimal weight,
+            BloodSugarStatus bloodSugarStatus, BloodPressureStatus bloodPressureStatus,
+            Boolean hasFamilyHypertension, String medications, String allergies, String healthGoal
+    ) {
+        if (birthDate != null) this.birthDate = birthDate;
+        if (gender != null) this.gender = gender;
+        if (height != null) this.height = height;
+        if (weight != null) this.weight = weight;
+        if (bloodSugarStatus != null) this.bloodSugarStatus = bloodSugarStatus;
+        if (bloodPressureStatus != null) this.bloodPressureStatus = bloodPressureStatus;
+        if (hasFamilyHypertension != null) this.hasFamilyHypertension = hasFamilyHypertension;
+        if (medications != null) this.medications = medications;
+        if (allergies != null) this.allergies = allergies;
+        if (healthGoal != null) this.healthGoal = healthGoal;
+
+        // 키 또는 몸무게가 변경되면 BMI 재계산
+        if (height != null || weight != null) {
+            calculateBmi();
+        }
+    }
+
+    public boolean applySurveyField(String fieldName, String rawValue) {
+        if (fieldName == null || fieldName.isBlank()) {
+            return true;
+        }
+
+        String key = HealthProfileFieldSupport.normalizeFieldName(fieldName);
+        boolean applied = true;
+        switch (key) {
+            case "birthDate" -> applied = HealthProfileFieldSupport.setDate(rawValue, value -> this.birthDate = value);
+            case "gender" -> applied = HealthProfileFieldSupport.setEnum(Gender.class, rawValue, value -> this.gender = value);
+            case "height" -> applied = HealthProfileFieldSupport.setDecimal(rawValue, value -> this.height = value);
+            case "weight" -> applied = HealthProfileFieldSupport.setDecimal(rawValue, value -> this.weight = value);
+            case "bmi" -> applied = HealthProfileFieldSupport.setDecimal(rawValue, value -> this.bmi = value);
+            case "bloodSugarStatus" -> applied = HealthProfileFieldSupport.setEnum(BloodSugarStatus.class, rawValue, value -> this.bloodSugarStatus = value);
+            case "bloodPressureStatus" -> applied = HealthProfileFieldSupport.setEnum(BloodPressureStatus.class, rawValue, value -> this.bloodPressureStatus = value);
+            case "hasFamilyHypertension" -> applied = HealthProfileFieldSupport.setBoolean(rawValue, value -> this.hasFamilyHypertension = value);
+            case "medications" -> this.medications = rawValue;
+            case "allergies" -> this.allergies = rawValue;
+            case "healthGoal" -> this.healthGoal = rawValue;
+            case "mealFrequency" -> applied = HealthProfileFieldSupport.setEnum(MealFrequency.class, rawValue, value -> this.mealFrequency = value);
+            case "foodPreference" -> applied = HealthProfileFieldSupport.setJsonCodeArray(FoodPreference.class, rawValue, value -> this.foodPreference = value);
+            case "sugarIntakeFreq" -> applied = HealthProfileFieldSupport.setEnum(SugarIntakeFreq.class, rawValue, value -> this.sugarIntakeFreq = value);
+            case "caffeineIntake" -> applied = HealthProfileFieldSupport.setBoolean(rawValue, value -> this.caffeineIntake = value);
+            case "exerciseFrequency" -> applied = HealthProfileFieldSupport.setEnum(ExerciseFrequency.class, rawValue, value -> this.exerciseFrequency = value);
+            case "exercisePlace" -> applied = HealthProfileFieldSupport.setJsonCodeArray(ExercisePlace.class, rawValue, value -> this.exercisePlace = value);
+            case "exerciseType" -> this.exerciseType = rawValue;
+            case "exerciseDuration" -> applied = HealthProfileFieldSupport.setEnum(ExerciseDuration.class, rawValue, value -> this.exerciseDuration = value);
+            case "avgSteps" -> applied = HealthProfileFieldSupport.setInteger(rawValue, value -> this.avgSteps = value);
+            case "sleepHours" -> applied = HealthProfileFieldSupport.setDecimal(rawValue, value -> this.sleepHours = value);
+            case "sleepQuality" -> applied = HealthProfileFieldSupport.setEnum(SleepQuality.class, rawValue, value -> this.sleepQuality = value);
+            case "smokingStatus" -> applied = HealthProfileFieldSupport.setBoolean(rawValue, value -> this.smokingStatus = value);
+            case "drinkingFrequency" -> applied = HealthProfileFieldSupport.setEnum(DrinkingFrequency.class, rawValue, value -> this.drinkingFrequency = value);
+            case "stressLevel" -> applied = HealthProfileFieldSupport.setEnum(StressLevel.class, rawValue, value -> this.stressLevel = value);
+            default -> applied = false;
+        }
+
+        if (applied && ("height".equals(key) || "weight".equals(key))) {
+            calculateBmi();
+        }
+        return applied;
+    }
+}

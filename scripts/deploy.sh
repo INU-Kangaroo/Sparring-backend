@@ -2,10 +2,17 @@ set -e
 
 DEPLOY_DIR="$HOME/server"
 COMPOSE_FILE="$DEPLOY_DIR/docker-compose-prod.yml"
+ENV_FILE="$DEPLOY_DIR/.env"
 IMAGE_TAG="${IMAGE_TAG}"
 GITHUB_REPOSITORY="${GITHUB_REPOSITORY}"
 CURRENT_APP_IMAGE=""
 ROLLBACK_TAG=""
+
+if [ -f "$ENV_FILE" ]; then
+  set -a
+  source "$ENV_FILE"
+  set +a
+fi
 
 echo "=============================="
 echo "  Sparring 배포 시작"
@@ -113,13 +120,13 @@ wait_for_health "app"
 echo ">> nginx 기동..."
 docker compose -f "$COMPOSE_FILE" up -d --no-deps nginx
 
-# 최종 외부 경로(/actuator/health) 확인
+# nginx 기동 확인
 echo ">> 헬스체크 시작..."
 MAX_RETRIES=18
 RETRY_INTERVAL=5
 count=0
 
-until curl -sf http://localhost/actuator/health > /dev/null; do
+until curl -sf http://localhost/nginx-health > /dev/null; do
   count=$((count + 1))
   if [ $count -ge $MAX_RETRIES ]; then
     echo "ERROR: 헬스체크 실패"
@@ -134,7 +141,7 @@ until curl -sf http://localhost/actuator/health > /dev/null; do
 
       echo ">> 롤백 후 헬스체크 재확인..."
       rollback_count=0
-      until curl -sf http://localhost/actuator/health > /dev/null; do
+      until curl -sf http://localhost/nginx-health > /dev/null; do
         rollback_count=$((rollback_count + 1))
         if [ $rollback_count -ge $MAX_RETRIES ]; then
           echo "ERROR: 롤백 후에도 헬스체크 실패"

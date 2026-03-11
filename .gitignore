@@ -37,8 +37,13 @@ bin/
 /nbdist/
 /.nb-gradle/
 
-# Docker Compose
-compose.yml
+# Docker Compose (로컬 개발용만 무시)
+docker-compose-dev.yml
+# docker-compose-prod.yml 은 Git에 포함 (배포용)
+
+# SSL 인증서 및 Certbot 데이터 (EC2 서버에서 생성됨)
+certbot/
+nginx/*.applied
 
 # Environment Variables
 .env

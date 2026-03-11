@@ -52,6 +52,11 @@ dependencies {
 
     // MySQL
     runtimeOnly 'com.mysql:mysql-connector-j'
+    implementation 'org.flywaydb:flyway-core'
+    implementation 'org.flywaydb:flyway-mysql'
+
+    // Actuator (헬스체크 엔드포인트 /actuator/health)
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
 
     // DevTools
     developmentOnly 'org.springframework.boot:spring-boot-devtools'
@@ -59,6 +64,7 @@ dependencies {
     // Testing
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'org.springframework.security:spring-security-test'
+    testRuntimeOnly 'com.h2database:h2'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 
     implementation 'me.paulschwarz:spring-dotenv:4.0.0'

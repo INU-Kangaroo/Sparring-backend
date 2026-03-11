@@ -17,7 +17,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
-@Tag(name = "Prediction", description = "혈당 예측 API")
+@Tag(name = "혈당 예측", description = "혈당 예측 API")
 @RestController
 @RequestMapping("/api/predictions")
 @RequiredArgsConstructor

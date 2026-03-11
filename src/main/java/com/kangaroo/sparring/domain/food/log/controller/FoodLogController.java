@@ -30,7 +30,7 @@ public class FoodLogController {
 
     private final FoodLogService foodLogService;
 
-    @Operation(description = "식사 기록 등록")
+    @Operation(summary = "식사 기록 등록", description = "사용자의 식사 기록을 등록합니다.")
     @PostMapping("/logs")
     public ResponseEntity<FoodLogCreateResponse> createFoodLog(
             @AuthenticationPrincipal UserIdPrincipal principal,
@@ -42,7 +42,7 @@ public class FoodLogController {
                 .body(foodLogService.createFoodLog(userId, request));
     }
 
-    @Operation(description = "식사 기록 일별 조회")
+    @Operation(summary = "식사 기록 일별 조회", description = "사용자의 특정 일자 식사 기록을 조회합니다.")
     @GetMapping("/logs/daily")
     public ResponseEntity<List<FoodLogListItemResponse>> getDailyFoodLogs(
             @AuthenticationPrincipal UserIdPrincipal principal,
@@ -54,7 +54,7 @@ public class FoodLogController {
         return ResponseEntity.ok(foodLogService.getDailyFoodLogs(userId, date));
     }
 
-    @Operation(description = "식사 기록 삭제")
+    @Operation(summary = "식사 기록 삭제", description = "사용자의 식사 기록을 삭제합니다.")
     @DeleteMapping("/logs/{foodLogId}")
     public ResponseEntity<Void> deleteFoodLog(
             @AuthenticationPrincipal UserIdPrincipal principal,

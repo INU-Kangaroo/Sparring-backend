@@ -30,6 +30,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -100,8 +101,8 @@ public class AuthController {
     )
     @ApiResponses({
             @ApiResponse(
-                    responseCode = "200",
-                    description = "OK",
+                    responseCode = "201",
+                    description = "Created",
                     content = @Content(
                             mediaType = "application/json",
                             examples = @ExampleObject(
@@ -147,7 +148,6 @@ public class AuthController {
                                     name = "Success",
                                     value = """
                                             {
-                                              "email": "test@example.com",
                                               "message": "회원가입이 완료되었습니다."
                                             }
                                             """
@@ -182,9 +182,9 @@ public class AuthController {
             )
     )
     @PostMapping("/signup")
-    public ResponseEntity<EmailResponse> signup(@Valid @RequestBody SignupRequest request) {
+    public ResponseEntity<MessageResponse> signup(@Valid @RequestBody SignupRequest request) {
         userRegistrationService.signup(request);
-        return ResponseEntity.ok(EmailResponse.of(request.getEmail(), "회원가입이 완료되었습니다."));
+        return ResponseEntity.status(HttpStatus.CREATED).body(MessageResponse.of("회원가입이 완료되었습니다."));
     }
 
     @Operation(summary = "로그인", description = "이메일/비밀번호 로그인")
@@ -284,15 +284,14 @@ public class AuthController {
     @Operation(summary = "소셜 회원가입 완료", description = "소셜 로그인 후 기본 프로필 입력으로 회원가입 완료 처리")
     @ApiResponses({
             @ApiResponse(
-                    responseCode = "200",
-                    description = "OK",
+                    responseCode = "201",
+                    description = "Created",
                     content = @Content(
                             mediaType = "application/json",
                             examples = @ExampleObject(
                                     name = "Success",
                                     value = """
                                             {
-                                              "email": "test@example.com",
                                               "message": "회원가입이 완료되었습니다."
                                             }
                                             """
@@ -301,14 +300,13 @@ public class AuthController {
             )
     })
     @PostMapping("/social/complete")
-    public ResponseEntity<EmailResponse> completeSocialSignup(
+    public ResponseEntity<MessageResponse> completeSocialSignup(
             @AuthenticationPrincipal UserIdPrincipal principal,
             @Valid @RequestBody SocialSignupCompleteRequest request
     ) {
         Long userId = PrincipalResolver.resolveUserId(principal);
         userRegistrationService.completeSocialSignup(userId, request);
-        String email = userAccountService.getEmailOrThrow(userId);
-        return ResponseEntity.ok(EmailResponse.of(email, "회원가입이 완료되었습니다."));
+        return ResponseEntity.status(HttpStatus.CREATED).body(MessageResponse.of("회원가입이 완료되었습니다."));
     }
 
     /**

@@ -37,20 +37,6 @@ public interface ReportRepository extends JpaRepository<Report, Long> {
             Pageable pageable
     );
 
-    @Query("""
-            SELECT r
-            FROM Report r
-            WHERE r.user.id = :userId
-              AND r.isDeleted = false
-              AND r.startDate BETWEEN :startDate AND :endDate
-            """)
-    Page<Report> findPageByUserIdAndStartDateBetween(
-            @Param("userId") Long userId,
-            @Param("startDate") LocalDate startDate,
-            @Param("endDate") LocalDate endDate,
-            Pageable pageable
-    );
-
     // 단건 조회 (권한 포함)
     @Query("SELECT r FROM Report r WHERE r.id = :reportId AND r.user.id = :userId AND r.isDeleted = false")
     Optional<Report> findByIdAndUserId(

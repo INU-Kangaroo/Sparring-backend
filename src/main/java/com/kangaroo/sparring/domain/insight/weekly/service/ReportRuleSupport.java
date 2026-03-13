@@ -270,7 +270,12 @@ class ReportRuleSupport {
         addBloodSugarStreakGood(goods, bsLogs, monday);
         addExerciseGoalGood(goods, exerciseLogs);
         addMealAttendanceGood(goods, mealLogs);
-        addMeasurementGoalGood(goods, bsLogs, bpLogs);
+
+        int bsRecordDays = calcRecordDaysForLogs(bsLogs, monday,
+                log -> log.getMeasurementTime().toLocalDate());
+        int bpRecordDays = calcRecordDaysForLogs(bpLogs, monday,
+                log -> log.getMeasuredAt().toLocalDate());
+        addMeasurementGoalGood(goods, bsRecordDays, bpRecordDays);
     }
 
     private void addWarningHighlights(
@@ -347,19 +352,16 @@ class ReportRuleSupport {
 
     private void addMeasurementGoalGood(
             List<HighlightEvidence> goods,
-            List<BloodSugarLog> bsLogs,
-            List<BloodPressureLog> bpLogs
+            int bsRecordDays,
+            int bpRecordDays
     ) {
-        if (bsLogs.size() < policy.getBloodSugarWeeklyTarget()
-                || bpLogs.size() < policy.getBloodPressureWeeklyTarget()) {
-            return;
-        }
+        if (bsRecordDays < WEEK_DAYS && bpRecordDays < WEEK_DAYS) return;
 
         goods.add(new HighlightEvidence(
                 HighlightType.GOOD,
                 "MEASUREMENT_GOAL",
                 "측정 목표 100% 달성",
-                Map.of("bloodSugar", bsLogs.size(), "bloodPressure", bpLogs.size())
+                Map.of("bloodSugarRecordDays", bsRecordDays, "bloodPressureRecordDays", bpRecordDays)
         ));
     }
 
@@ -680,6 +682,19 @@ class ReportRuleSupport {
 
         List<Double> y = x.stream().map(dayAverages::get).toList();
         return linearRegressionSlope(x, y);
+    }
+
+    private <T> int calcRecordDaysForLogs(
+            List<T> logs,
+            LocalDate monday,
+            java.util.function.Function<T, LocalDate> dateExtractor
+    ) {
+        LocalDate sunday = monday.plusDays(WEEK_DAYS - 1L);
+        return (int) logs.stream()
+                .map(dateExtractor)
+                .filter(d -> !d.isBefore(monday) && !d.isAfter(sunday))
+                .distinct()
+                .count();
     }
 
     private Double linearRegressionSlope(List<Integer> x, List<Double> y) {

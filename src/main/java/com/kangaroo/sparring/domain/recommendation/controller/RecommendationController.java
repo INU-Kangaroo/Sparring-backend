@@ -1,5 +1,6 @@
 package com.kangaroo.sparring.domain.recommendation.controller;
 
+import com.kangaroo.sparring.domain.healthprofile.service.HealthProfileGuardService;
 import com.kangaroo.sparring.domain.recommendation.dto.req.ExerciseRecommendationRequest;
 import com.kangaroo.sparring.domain.recommendation.dto.res.ExerciseRecommendationResponse;
 import com.kangaroo.sparring.domain.recommendation.dto.res.SupplementRecommendationResponse;
@@ -23,6 +24,7 @@ public class RecommendationController {
 
     private final ExerciseRecommendationService exerciseRecommendationService;
     private final SupplementRecommendationService supplementRecommendationService;
+    private final HealthProfileGuardService healthProfileGuardService;
 
     @Operation(summary = "운동 추천 조회", description = "사용자의 건강 정보를 기반으로 맞춤 운동 추천")
     @PostMapping("/exercise")
@@ -31,6 +33,7 @@ public class RecommendationController {
             @Valid @RequestBody ExerciseRecommendationRequest request
     ) {
         Long userId = PrincipalResolver.resolveUserId(principal);
+        healthProfileGuardService.ensureProfileComplete(userId);
         ExerciseRecommendationResponse response = exerciseRecommendationService
                 .getExerciseRecommendations(userId, request);
         return ResponseEntity.ok(response);
@@ -43,6 +46,7 @@ public class RecommendationController {
             @Valid @RequestBody ExerciseRecommendationRequest request
     ) {
         Long userId = PrincipalResolver.resolveUserId(principal);
+        healthProfileGuardService.ensureProfileComplete(userId);
         ExerciseRecommendationResponse response = exerciseRecommendationService
                 .refreshExerciseRecommendations(userId, request);
         return ResponseEntity.ok(response);
@@ -54,6 +58,7 @@ public class RecommendationController {
             @AuthenticationPrincipal UserIdPrincipal principal
     ) {
         Long userId = PrincipalResolver.resolveUserId(principal);
+        healthProfileGuardService.ensureProfileComplete(userId);
         SupplementRecommendationResponse response = supplementRecommendationService
                 .getSupplementRecommendations(userId);
         return ResponseEntity.ok(response);
@@ -65,6 +70,7 @@ public class RecommendationController {
             @AuthenticationPrincipal UserIdPrincipal principal
     ) {
         Long userId = PrincipalResolver.resolveUserId(principal);
+        healthProfileGuardService.ensureProfileComplete(userId);
         SupplementRecommendationResponse response = supplementRecommendationService
                 .refreshSupplementRecommendations(userId);
         return ResponseEntity.ok(response);

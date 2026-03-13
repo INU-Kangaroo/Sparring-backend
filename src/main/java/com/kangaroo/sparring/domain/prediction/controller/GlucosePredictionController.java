@@ -1,5 +1,6 @@
 package com.kangaroo.sparring.domain.prediction.controller;
 
+import com.kangaroo.sparring.domain.healthprofile.service.HealthProfileGuardService;
 import com.kangaroo.sparring.domain.prediction.dto.req.GlucosePredictionRequest;
 import com.kangaroo.sparring.domain.prediction.dto.res.GlucosePredictionResponse;
 import com.kangaroo.sparring.domain.prediction.service.GlucosePredictionService;
@@ -25,6 +26,7 @@ public class GlucosePredictionController {
 
     private final GlucosePredictionService glucosePredictionService;
     private final UserRepository userRepository;
+    private final HealthProfileGuardService healthProfileGuardService;
 
     @Operation(summary = "식후 혈당 예측", description = "음식 섭취 후 시간대별 혈당 변화 예측 (+0/+30/+60/+120분)")
     @PostMapping("/blood-sugar")
@@ -33,6 +35,7 @@ public class GlucosePredictionController {
             @Valid @RequestBody GlucosePredictionRequest request
     ) {
         Long userId = PrincipalResolver.resolveUserId(principal);
+        healthProfileGuardService.ensureProfileComplete(userId);
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
 

@@ -15,6 +15,7 @@ public enum ErrorCode {
     INACTIVE_USER(HttpStatus.FORBIDDEN, "U004", "비활성화된 사용자입니다"),
     PASSWORD_CHANGE_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "U005", "소셜 로그인 계정은 비밀번호 변경이 불가능합니다"),
     INVALID_PASSWORD_CONFIRM(HttpStatus.BAD_REQUEST, "U006", "새 비밀번호 확인이 일치하지 않습니다"),
+    PROFILE_INCOMPLETE(HttpStatus.FORBIDDEN, "U007", "건강 프로필 입력이 필요합니다"),
 
     // JWT & Auth
     INVALID_TOKEN(HttpStatus.UNAUTHORIZED, "A001", "유효하지 않은 토큰입니다"),

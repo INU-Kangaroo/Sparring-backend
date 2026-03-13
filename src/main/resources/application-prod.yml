@@ -16,6 +16,12 @@ spring:
         format_sql: false
         show_sql: false
 
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
 logging:
   level:
     com.kangaroo.sparring: INFO

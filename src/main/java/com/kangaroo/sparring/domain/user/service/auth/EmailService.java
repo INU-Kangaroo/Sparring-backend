@@ -6,10 +6,7 @@ import com.kangaroo.sparring.global.exception.CustomException;
 import com.kangaroo.sparring.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.mail.SimpleMailMessage;
-import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -23,12 +20,9 @@ import java.util.concurrent.TimeUnit;
 @RequiredArgsConstructor
 public class EmailService {
 
-    private final JavaMailSender mailSender;
+    private final EmailAsyncSender emailAsyncSender;
     private final RedisTemplate<String, String> redisTemplate;
     private final UserRepository userRepository;
-
-    @Value("${spring.mail.username}")
-    private String fromEmail;
 
     private static final String VERIFICATION_PREFIX = "email:verification:";
     private static final String LATEST_PREFIX = "email:verification:latest:";
@@ -160,7 +154,7 @@ public class EmailService {
         String verificationId = generateVerificationId();
         saveVerification(verificationId, email, code, userId);
         startResendCooldown(email);
-        sendEmail(email, code);
+        emailAsyncSender.sendVerificationCode(email, code);
 
         LocalDateTime expiresAt = LocalDateTime.now().plusMinutes(CODE_EXPIRATION_MINUTES);
         log.info("{}: email={}, verificationId={}", logMessage, email, verificationId);
@@ -221,29 +215,4 @@ public class EmailService {
         return String.format("%06d", CODE_RANDOM.nextInt(1_000_000));
     }
 
-    /**
-     * 이메일 발송
-     */
-    private void sendEmail(String toEmail, String code) {
-        try {
-            SimpleMailMessage message = new SimpleMailMessage();
-            message.setFrom(fromEmail);
-            message.setTo(toEmail);
-            message.setSubject("[Sparring] 이메일 인증코드");
-            message.setText(
-                    "안녕하세요. Sparring입니다.\n\n" +
-                            "아래 인증코드를 입력하여 이메일 인증을 완료해주세요.\n\n" +
-                            "인증코드: " + code + "\n\n" +
-                            "이 코드는 5분간 유효합니다.\n\n" +
-                            "감사합니다."
-            );
-
-            mailSender.send(message);
-            log.info("이메일 발송 완료: {}", toEmail);
-
-        } catch (Exception e) {
-            log.error("이메일 발송 실패: {}", toEmail, e);
-            throw new CustomException(ErrorCode.EMAIL_SEND_FAILED);
-        }
-    }
 }

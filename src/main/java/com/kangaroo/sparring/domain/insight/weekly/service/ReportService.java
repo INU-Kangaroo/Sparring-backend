@@ -35,7 +35,6 @@ import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
-import java.time.YearMonth;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
@@ -74,22 +73,6 @@ public class ReportService {
                 Math.min(Math.max(size, 1), 100),
                 Sort.by(Sort.Direction.DESC, "startDate")
         );
-
-        if (year != null) {
-            YearMonth yearMonth = month != null
-                    ? YearMonth.of(year, month)
-                    : YearMonth.of(year, 1);
-            LocalDate startDate = month != null
-                    ? yearMonth.atDay(1)
-                    : LocalDate.of(year, 1, 1);
-            LocalDate endDate = month != null
-                    ? yearMonth.atEndOfMonth()
-                    : LocalDate.of(year, 12, 31);
-
-            return reportRepository.findPageByUserIdAndStartDateBetween(userId, startDate, endDate, pageable)
-                    .map(ReportListItemResponse::from);
-        }
-
         return reportRepository.findPageByUserIdAndYearMonth(userId, year, month, pageable)
                 .map(ReportListItemResponse::from);
     }
@@ -101,7 +84,6 @@ public class ReportService {
         return buildResponse(report, userId, report.getStartDate(), report.getEndDate());
     }
 
-    @Transactional
     private ReportResponse generateAndSave(Long userId, LocalDate monday, LocalDate sunday) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));

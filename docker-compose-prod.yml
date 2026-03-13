@@ -1,31 +1,4 @@
 services:
-  mysql:
-    image: mysql:8.0
-    container_name: sparring-mysql
-    environment:
-      - MYSQL_DATABASE=${DB_NAME}
-      - MYSQL_ROOT_PASSWORD=${DB_ROOT_PASSWORD}
-      - MYSQL_USER=${DB_USERNAME}
-      - MYSQL_PASSWORD=${DB_PASSWORD}
-      - TZ=Asia/Seoul
-    volumes:
-      - mysql_data:/var/lib/mysql
-    ports:
-      - "127.0.0.1:3306:3306"
-    command:
-      - --character-set-server=utf8mb4
-      - --collation-server=utf8mb4_unicode_ci
-      - --local-infile=1
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_ROOT_PASSWORD}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
-    restart: unless-stopped
-    networks:
-      - sparring-network
-
   redis:
     image: redis:7-alpine
     container_name: sparring-redis
@@ -49,7 +22,7 @@ services:
     environment:
       - SPRING_PROFILES_ACTIVE=${SPRING_PROFILES_ACTIVE}
       - JAVA_TOOL_OPTIONS=-Duser.timezone=Asia/Seoul
-      - DB_URL=jdbc:mysql://sparring-mysql:3306/${DB_NAME}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul&characterEncoding=UTF-8
+      - DB_URL=${DB_URL}
       - DB_USERNAME=${DB_USERNAME}
       - DB_PASSWORD=${DB_PASSWORD}
       - REDIS_HOST=${REDIS_HOST}
@@ -72,8 +45,6 @@ services:
       - GEMINI_API_URL=${GEMINI_API_URL}
       - ML_SERVER_URL=${ML_SERVER_URL}
     depends_on:
-      mysql:
-        condition: service_healthy
       redis:
         condition: service_healthy
     healthcheck:
@@ -106,7 +77,6 @@ services:
       - sparring-network
 
 volumes:
-  mysql_data:
   redis_data:
 
 networks:

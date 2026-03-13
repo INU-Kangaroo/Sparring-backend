@@ -10,7 +10,8 @@ public enum ExerciseFrequency {
     ONE_TO_TWO("1~2회"),
     TWO_TO_THREE("2~3회"),
     THREE_TO_FOUR("3~4회"),
-    FOUR_TO_FIVE("4~5회");
+    FOUR_TO_FIVE("4~5회"),
+    DAILY("매일");
 
     private final String description;
 }

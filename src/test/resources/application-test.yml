@@ -10,7 +10,10 @@ spring:
     redis:
       host: localhost
       port: 6379
+      username:
       password:
+      ssl:
+        enabled: false
   jpa:
     hibernate:
       ddl-auto: create-drop
@@ -19,11 +22,20 @@ spring:
         dialect: org.hibernate.dialect.H2Dialect
         format_sql: false
         show_sql: false
+        jdbc:
+          time_zone: Asia/Seoul
     open-in-view: false
+  jackson:
+    time-zone: Asia/Seoul
   oauth2:
     google:
-      client-id: test
-      client-secret: test
+      client-id: test-google-client-id
+      web-client-id: test-google-client-id
+      ios-client-id: test-google-client-id
+      web-redirect-uri: http://localhost:8080/oauth2/callback/google
+      ios-redirect-uri: http://localhost:8080/oauth2/callback/google
+      client-secret: test-google-client-secret
+      sdk-redirect-uri: http://localhost:8080/oauth2/callback/google
       token-uri: https://oauth2.googleapis.com/token
       user-info-uri: https://www.googleapis.com/oauth2/v3/userinfo
       token-info-uri: https://oauth2.googleapis.com/tokeninfo
@@ -32,11 +44,12 @@ spring:
         - profile
         - email
     kakao:
-      client-id: test
+      client-id: test-kakao-client-id
+      client-secret: test-kakao-client-secret
       token-uri: https://kauth.kakao.com/oauth/token
       user-info-uri: https://kapi.kakao.com/v2/user/me
       access-token-info-uri: https://kapi.kakao.com/v1/user/access_token_info
-      app-id: test
+      app-id: test-kakao-app-id
       scope:
         - profile_nickname
         - profile_image
@@ -52,17 +65,46 @@ spring:
           auth: true
           starttls:
             enable: true
+            required: true
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
 
 jwt:
-  secret: test-secret-key-for-ci-at-least-32-characters-long
+  secret: test-secret-key-for-ci-testing-at-least-32-characters-long
   access-token-validity: 3600000
   refresh-token-validity: 604800000
 
+cors:
+  allowed-origin-patterns:
+    - "*"
+  allow-credentials: false
+
 gemini:
   api:
-    key: test
+    key: test-gemini-key
     url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent
 
 ml:
   server:
     url: http://localhost:8000
+
+report:
+  policy:
+    blood-sugar-weekly-target: 21
+    blood-pressure-weekly-target: 14
+    exercise-active-days-target: 5
+    full-meal-days-target: 7
+    severe-high-blood-sugar: 180
+    severe-high-systolic: 160
+    severe-high-diastolic: 100
+    severe-risk-penalty: 30.0
+    variability-penalty-factor: 120.0
+    blood-sugar-trend-slope-factor: 4.0
+    systolic-trend-slope-factor: 5.0
+    diastolic-trend-slope-factor: 7.0
+    overall-health-weight: 0.35
+    overall-consistency-weight: 0.20
+    overall-stability-weight: 0.15
+    overall-trend-weight: 0.10
+    overall-lifestyle-weight: 0.20

@@ -36,8 +36,14 @@ public class GoogleOAuth2ProviderClient {
     @Value("${spring.oauth2.google.web-client-id:${spring.oauth2.google.client-id:}}")
     private String googleWebClientId;
 
+    @Value("${spring.oauth2.google.ios-client-id:${spring.oauth2.google.client-id:}}")
+    private String googleIosClientId;
+
     @Value("${spring.oauth2.google.web-redirect-uri:}")
     private String googleWebRedirectUri;
+
+    @Value("${spring.oauth2.google.ios-redirect-uri:}")
+    private String googleIosRedirectUri;
 
     @Value("${spring.oauth2.google.client-secret:}")
     private String googleClientSecret;
@@ -212,10 +218,14 @@ public class GoogleOAuth2ProviderClient {
         }
         String requestRedirectUri = normalizeRedirectUri(redirectUri);
         String configuredWebRedirectUri = normalizeRedirectUri(googleWebRedirectUri);
-        if (requestRedirectUri == null || configuredWebRedirectUri == null) {
+        String configuredIosRedirectUri = normalizeRedirectUri(googleIosRedirectUri);
+        if (requestRedirectUri == null) {
             return null;
         }
-        if (requestRedirectUri.equals(configuredWebRedirectUri)) {
+        if (configuredIosRedirectUri != null && requestRedirectUri.equals(configuredIosRedirectUri)) {
+            return firstNonBlank(googleIosClientId, googleDefaultClientId);
+        }
+        if (configuredWebRedirectUri != null && requestRedirectUri.equals(configuredWebRedirectUri)) {
             return firstNonBlank(googleWebClientId, googleDefaultClientId);
         }
         return null;

@@ -55,11 +55,22 @@ public class GeminiApiClient {
                         apiUrl, e.getStatusCode(), System.currentTimeMillis() - startedAt, attempt + 1, keys.size(),
                         abbreviate(e.getResponseBodyAsString()));
             } catch (HttpStatusCodeException e) {
+                if (e.getStatusCode() == HttpStatus.SERVICE_UNAVAILABLE && attempt + 1 < keys.size()) {
+                    log.warn("Gemini API 일시 과부하(503), 다음 키로 재시도: endpoint={}, status={}, elapsedMs={}, attempt={}/{}, body={}",
+                            apiUrl, e.getStatusCode(), System.currentTimeMillis() - startedAt, attempt + 1, keys.size(),
+                            abbreviate(e.getResponseBodyAsString()));
+                    continue;
+                }
                 log.error("Gemini API HTTP 오류: endpoint={}, status={}, elapsedMs={}, attempt={}, body={}",
                         apiUrl, e.getStatusCode(), System.currentTimeMillis() - startedAt, attempt + 1,
                         abbreviate(e.getResponseBodyAsString()));
                 throw new CustomException(ErrorCode.RECOMMENDATION_AI_CALL_FAILED);
             } catch (ResourceAccessException e) {
+                if (attempt + 1 < keys.size()) {
+                    log.warn("Gemini API 네트워크/타임아웃 오류, 다음 키로 재시도: endpoint={}, elapsedMs={}, attempt={}/{}, message={}",
+                            apiUrl, System.currentTimeMillis() - startedAt, attempt + 1, keys.size(), e.getMessage());
+                    continue;
+                }
                 log.error("Gemini API 네트워크/타임아웃 오류: endpoint={}, elapsedMs={}, attempt={}, message={}",
                         apiUrl, System.currentTimeMillis() - startedAt, attempt + 1, e.getMessage());
                 throw new CustomException(ErrorCode.RECOMMENDATION_AI_CALL_FAILED);

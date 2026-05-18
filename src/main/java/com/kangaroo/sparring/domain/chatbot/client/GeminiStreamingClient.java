@@ -3,10 +3,10 @@ package com.kangaroo.sparring.domain.chatbot.client;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kangaroo.sparring.domain.chatbot.entity.ChatMessage;
+import com.kangaroo.sparring.global.client.GeminiApiKeySelector;
 import com.kangaroo.sparring.global.exception.CustomException;
 import com.kangaroo.sparring.global.exception.ErrorCode;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.MediaType;
 import org.springframework.http.codec.ServerSentEvent;
@@ -31,21 +31,18 @@ public class GeminiStreamingClient {
 
     private final WebClient webClient;
     private final ObjectMapper objectMapper;
-    private final String apiKey;
-    private final String streamingUrl;
+    private final GeminiApiKeySelector keySelector;
     private final String baseSystemPrompt;
 
     public GeminiStreamingClient(
             WebClient.Builder webClientBuilder,
             ObjectMapper objectMapper,
-            @Value("${gemini.api.key}") String apiKey,
-            @Value("${gemini.api.url}") String geminiApiUrl) {
+            GeminiApiKeySelector keySelector) {
         this.webClient = webClientBuilder
                 .codecs(config -> config.defaultCodecs().maxInMemorySize(512 * 1024))
                 .build();
         this.objectMapper = objectMapper;
-        this.apiKey = apiKey;
-        this.streamingUrl = geminiApiUrl.replace("generateContent", "streamGenerateContent");
+        this.keySelector = keySelector;
         this.baseSystemPrompt = readPromptTemplate(SYSTEM_PROMPT_PATH);
     }
 
@@ -55,12 +52,27 @@ public class GeminiStreamingClient {
      */
     public Flux<String> streamChat(List<ChatMessage> history, String userContextSummary) {
         long startedAt = System.currentTimeMillis();
-        String url = streamingUrl + "?key=" + apiKey + "&alt=sse";
+        String apiUrl = keySelector.getApiUrl();
+        String streamingUrl = apiUrl.replace("generateContent", "streamGenerateContent");
+        List<String> keys = keySelector.nextKeyOrder();
         Map<String, Object> requestBody = buildRequestBody(history, userContextSummary);
         AtomicInteger chunkCount = new AtomicInteger(0);
-        log.info("Gemini 스트리밍 호출 시작: messages={}, hasUserContext={}",
+        log.info("Gemini 스트리밍 호출 시작: messages={}, hasUserContext={}, keyPoolSize={}",
                 history == null ? 0 : history.size(),
-                userContextSummary != null && !userContextSummary.isBlank());
+                userContextSummary != null && !userContextSummary.isBlank(),
+                keys.size());
+
+        return streamChatWithFallback(streamingUrl, keys, 0, requestBody, chunkCount, startedAt);
+    }
+
+    private Flux<String> streamChatWithFallback(
+            String streamingUrl,
+            List<String> keys,
+            int attempt,
+            Map<String, Object> requestBody,
+            AtomicInteger chunkCount,
+            long startedAt) {
+        String url = streamingUrl + "?key=" + keys.get(attempt) + "&alt=sse";
 
         return webClient.post()
                 .uri(url)
@@ -89,6 +101,14 @@ public class GeminiStreamingClient {
                         chunkCount.get(), System.currentTimeMillis() - startedAt))
                 .doOnCancel(() -> log.info("Gemini 스트리밍 호출 취소: chunks={}, elapsedMs={}",
                         chunkCount.get(), System.currentTimeMillis() - startedAt))
+                .onErrorResume(ex -> {
+                    if (isRateLimitException(ex) && attempt + 1 < keys.size()) {
+                        log.warn("Gemini 스트리밍 한도 초과, 다음 키로 재시도: elapsedMs={}, attempt={}/{}",
+                                System.currentTimeMillis() - startedAt, attempt + 1, keys.size());
+                        return streamChatWithFallback(streamingUrl, keys, attempt + 1, requestBody, chunkCount, startedAt);
+                    }
+                    return Mono.error(ex);
+                })
                 .onErrorMap(
                         ex -> !(ex instanceof CustomException),
                         ex -> {
@@ -97,6 +117,13 @@ public class GeminiStreamingClient {
                             return new CustomException(ErrorCode.CHATBOT_AI_CALL_FAILED);
                         }
                 );
+    }
+
+    private boolean isRateLimitException(Throwable throwable) {
+        if (!(throwable instanceof CustomException customException)) {
+            return false;
+        }
+        return customException.getErrorCode() == ErrorCode.CHATBOT_AI_RATE_LIMIT;
     }
 
     private String toJsonString(Object data) {

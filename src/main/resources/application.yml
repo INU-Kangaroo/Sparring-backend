@@ -133,7 +133,10 @@ springdoc:
 # Gemini API Configuration
 gemini:
   api:
-    key: ${GEMINI_API_KEY}
+    keys:
+      - ${GEMINI_API_KEY_1:}
+      - ${GEMINI_API_KEY_2:}
+      - ${GEMINI_API_KEY_3:}
     url: ${GEMINI_API_URL}
 
 # ML Server Configuration

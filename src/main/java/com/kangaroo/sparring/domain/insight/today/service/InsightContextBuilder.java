@@ -10,6 +10,7 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Comparator;
@@ -20,6 +21,7 @@ import java.util.List;
 public class InsightContextBuilder {
 
     private final RecordReadService recordReadService;
+    private final Clock kstClock;
 
     // 정상 범위 상수
     private static final int FASTING_SUGAR_NORMAL_MAX = 100;
@@ -29,10 +31,10 @@ public class InsightContextBuilder {
     private static final int STABLE_CONSECUTIVE_DAYS = 3;
 
     public InsightContext build(Long userId) {
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(kstClock);
         LocalDate lookbackStartDate = today.minusDays(DAYS_LOOKBACK);
         LocalDateTime start = lookbackStartDate.atStartOfDay();
-        LocalDateTime end = LocalDateTime.now();
+        LocalDateTime end = LocalDateTime.now(kstClock);
 
         List<BloodSugarRecord> sugarLogs = recordReadService.getBloodSugarRecords(userId, start, end);
         List<BloodPressureRecord> pressureLogs = recordReadService.getBloodPressureRecords(userId, start, end);

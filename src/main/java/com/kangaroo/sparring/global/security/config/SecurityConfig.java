@@ -117,13 +117,15 @@ public class SecurityConfig {
             return false;
         }
 
-        String resolvedClientIp = request.getRemoteAddr();
-        String forwardedFor = request.getHeader("X-Forwarded-For");
-        if (forwardedFor != null && !forwardedFor.isBlank()) {
-            resolvedClientIp = forwardedFor.split(",")[0].trim();
-        }
-
-        final String clientIp = resolvedClientIp;
+        final String clientIp = resolveClientIp(request);
         return allowedIps.stream().anyMatch(ip -> ip.equals(clientIp));
+    }
+
+    private String resolveClientIp(HttpServletRequest request) {
+        String realIp = request.getHeader("X-Real-IP");
+        if (realIp != null && !realIp.isBlank()) {
+            return realIp.trim();
+        }
+        return request.getRemoteAddr();
     }
 }

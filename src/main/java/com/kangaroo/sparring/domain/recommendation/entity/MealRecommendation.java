@@ -9,6 +9,8 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
+import static com.kangaroo.sparring.global.support.KstDateTimeSupport.nowDateTime;
+
 @Entity
 @Table(name = "meal_recommendation")
 @Getter
@@ -49,11 +51,11 @@ public class MealRecommendation {
 
     @PrePersist
     protected void onCreate() {
-        createdAt = updatedAt = LocalDateTime.now();
+        createdAt = updatedAt = nowDateTime();
     }
 
     @PreUpdate
     protected void onUpdate() {
-        updatedAt = LocalDateTime.now();
+        updatedAt = nowDateTime();
     }
 }

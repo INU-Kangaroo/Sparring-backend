@@ -8,6 +8,8 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.time.LocalDateTime;
 
+import static com.kangaroo.sparring.global.support.KstDateTimeSupport.nowDateTime;
+
 @Getter
 @MappedSuperclass
 @EntityListeners(AuditingEntityListener.class)
@@ -28,7 +30,7 @@ public abstract class BaseEntity {
     private LocalDateTime deletedAt;
 
     public void delete() {
-        this.deletedAt = LocalDateTime.now();
+        this.deletedAt = nowDateTime();
         this.isDeleted = true;
     }
 }

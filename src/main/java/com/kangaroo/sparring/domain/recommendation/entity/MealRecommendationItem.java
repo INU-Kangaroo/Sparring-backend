@@ -6,6 +6,8 @@ import lombok.*;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+import static com.kangaroo.sparring.global.support.KstDateTimeSupport.nowDateTime;
+
 @Entity
 @Table(name = "meal_recommendation_item")
 @Getter
@@ -54,6 +56,6 @@ public class MealRecommendationItem {
 
     @PrePersist
     protected void onCreate() {
-        createdAt = LocalDateTime.now();
+        createdAt = nowDateTime();
     }
 }

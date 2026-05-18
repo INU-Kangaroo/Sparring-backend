@@ -10,6 +10,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.Optional;
@@ -24,14 +25,15 @@ public class InsightService {
     private final InsightPromptSupport insightPromptSupport;
     private final InsightCacheService insightCacheService;
     private final GeminiApiClient geminiApiClient;
+    private final Clock kstClock;
 
     public TodayInsightResponse getTodayInsight(Long userId) {
-        LocalTime now = LocalTime.now();
+        LocalTime now = LocalTime.now(kstClock);
         MealTimeSlot slot = MealTimeSlot.from(now);
 
         String cacheKey = insightCacheService.buildKey(
                 userId,
-                LocalDate.now().toString(),
+                LocalDate.now(kstClock).toString(),
                 slot.cacheKey()
         );
 

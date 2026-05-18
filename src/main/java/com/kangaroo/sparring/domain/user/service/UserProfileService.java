@@ -20,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -41,6 +42,7 @@ public class UserProfileService {
     private final UserLookupService userLookupService;
     private final HealthProfileRepository healthProfileRepository;
     private final RecordReadService recordReadService;
+    private final Clock kstClock;
 
     public UserProfileResponse getProfile(Long userId) {
         long startedAt = System.currentTimeMillis();
@@ -104,7 +106,7 @@ public class UserProfileService {
         UserHomeCardResponse response = UserHomeCardResponse.builder()
                 .name(user.getUsername())
                 .profileImageUrl(user.getProfileImageUrl())
-                .displayDate(formatDisplayDate(LocalDate.now()))
+                .displayDate(formatDisplayDate(LocalDate.now(kstClock)))
                 .tags(tagCandidates.stream()
                         .limit(4)
                         .map(UserHomeCardResponse.TagCandidate::getLabel)
@@ -156,7 +158,7 @@ public class UserProfileService {
     }
 
     private BigDecimal getLast7DaysAverage(Long userId) {
-        LocalDate endDate = LocalDate.now();
+        LocalDate endDate = LocalDate.now(kstClock);
         LocalDate startDate = endDate.minusDays(6);
         LocalDateTime startDateTime = startDate.atStartOfDay();
         LocalDateTime endDateTime = endDate.atTime(LocalTime.MAX);
@@ -179,7 +181,7 @@ public class UserProfileService {
             return 0;
         }
 
-        LocalDate expected = LocalDate.now();
+        LocalDate expected = LocalDate.now(kstClock);
         int streak = 0;
 
         for (LocalDate measuredDate : measuredDates) {
@@ -267,10 +269,11 @@ public class UserProfileService {
     }
 
     private void addAgeTag(List<UserHomeCardResponse.TagCandidate> candidates, LocalDate birthDate) {
-        if (birthDate == null || birthDate.isAfter(LocalDate.now())) {
+        LocalDate today = LocalDate.now(kstClock);
+        if (birthDate == null || birthDate.isAfter(today)) {
             return;
         }
-        int age = (int) ChronoUnit.YEARS.between(birthDate, LocalDate.now());
+        int age = (int) ChronoUnit.YEARS.between(birthDate, today);
         if (age >= 0) {
             addCandidate(candidates, "AGE", age + "세");
         }

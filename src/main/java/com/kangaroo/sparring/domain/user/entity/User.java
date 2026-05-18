@@ -9,6 +9,8 @@ import lombok.*;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
+import static com.kangaroo.sparring.global.support.KstDateTimeSupport.nowDateTime;
+
 @Entity
 @Table(name = "user")
 @Getter
@@ -56,7 +58,7 @@ public class User extends BaseEntity {
 
     // 비즈니스 메서드
     public void updateLastLogin() {
-        this.lastLoginAt = LocalDateTime.now();
+        this.lastLoginAt = nowDateTime();
     }
 
     public void updateProfile(String username, String profileImageUrl) {

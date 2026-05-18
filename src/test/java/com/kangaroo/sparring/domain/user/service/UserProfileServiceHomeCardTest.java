@@ -19,7 +19,10 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -38,6 +41,8 @@ class UserProfileServiceHomeCardTest {
     private HealthProfileRepository healthProfileRepository;
     @Mock
     private RecordReadService recordReadService;
+    @Mock
+    private Clock kstClock;
     @InjectMocks
     private UserProfileService userProfileService;
 
@@ -68,6 +73,8 @@ class UserProfileServiceHomeCardTest {
 
         when(userLookupService.getUserOrThrow(userId)).thenReturn(user);
         when(healthProfileRepository.findByUserId(userId)).thenReturn(Optional.of(profile));
+        when(kstClock.getZone()).thenReturn(ZoneId.of("Asia/Seoul"));
+        when(kstClock.instant()).thenReturn(Instant.parse("2026-05-19T00:00:00Z"));
 
         UserHomeCardResponse response = userProfileService.getHomeCard(userId);
 

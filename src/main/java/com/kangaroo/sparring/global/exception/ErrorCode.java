@@ -73,6 +73,7 @@ public enum ErrorCode {
     CHATBOT_AI_RATE_LIMIT(HttpStatus.TOO_MANY_REQUESTS, "CB003", "AI 요청 한도를 초과했습니다. 잠시 후 다시 시도해주세요"),
     CHATBOT_SESSION_SERIALIZE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "CB004", "세션 저장 중 오류가 발생했습니다"),
     CHATBOT_SESSION_DESERIALIZE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "CB005", "세션 불러오기 중 오류가 발생했습니다"),
+    CHATBOT_STREAM_NOT_FOUND(HttpStatus.NOT_FOUND, "CB006", "스트림을 찾을 수 없거나 접근 권한이 없습니다"),
 
     // Home
     INSIGHT_GENERATE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "H001", "인사이트 생성에 실패했습니다"),

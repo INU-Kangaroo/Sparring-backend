@@ -6,9 +6,10 @@ import com.kangaroo.sparring.domain.insight.weekly.dto.internal.ScoreEvidence;
 import com.kangaroo.sparring.domain.insight.weekly.dto.res.ReportResponse;
 import com.kangaroo.sparring.domain.insight.weekly.entity.Report;
 import com.kangaroo.sparring.domain.insight.weekly.repository.ReportRepository;
-import com.kangaroo.sparring.domain.record.common.read.RecordReadService;
+import com.kangaroo.sparring.domain.record.common.RecordReadService;
 import com.kangaroo.sparring.domain.user.entity.User;
 import com.kangaroo.sparring.domain.user.repository.UserRepository;
+import com.kangaroo.sparring.domain.user.service.UserLookupService;
 import org.junit.jupiter.api.Test;
 
 import java.time.Clock;
@@ -35,6 +36,7 @@ class ReportServiceCachePolicyTest {
         ReportRepository reportRepository = mock(ReportRepository.class);
         ReportPersistenceService reportPersistenceService = mock(ReportPersistenceService.class);
         UserRepository userRepository = mock(UserRepository.class);
+        UserLookupService userLookupService = mock(UserLookupService.class);
         RecordReadService recordReadService = mock(RecordReadService.class);
         ReportGeminiService reportGeminiService = mock(ReportGeminiService.class);
         ReportRuleEngine reportRuleEngine = mock(ReportRuleEngine.class);
@@ -44,6 +46,7 @@ class ReportServiceCachePolicyTest {
                 reportRepository,
                 reportPersistenceService,
                 userRepository,
+                userLookupService,
                 recordReadService,
                 reportGeminiService,
                 reportRuleEngine,
@@ -85,6 +88,7 @@ class ReportServiceCachePolicyTest {
         ReportRepository reportRepository = mock(ReportRepository.class);
         ReportPersistenceService reportPersistenceService = mock(ReportPersistenceService.class);
         UserRepository userRepository = mock(UserRepository.class);
+        UserLookupService userLookupService = mock(UserLookupService.class);
         RecordReadService recordReadService = mock(RecordReadService.class);
         ReportGeminiService reportGeminiService = mock(ReportGeminiService.class);
         ReportRuleEngine reportRuleEngine = mock(ReportRuleEngine.class);
@@ -94,6 +98,7 @@ class ReportServiceCachePolicyTest {
                 reportRepository,
                 reportPersistenceService,
                 userRepository,
+                userLookupService,
                 recordReadService,
                 reportGeminiService,
                 reportRuleEngine,

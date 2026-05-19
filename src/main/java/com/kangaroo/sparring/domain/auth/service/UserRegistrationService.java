@@ -15,6 +15,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import static com.kangaroo.sparring.global.support.LogMaskingSupport.maskEmail;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -30,7 +32,7 @@ public class UserRegistrationService {
 
     @Transactional
     public void signup(SignupRequest request) {
-        log.info("회원가입 시도: {}", request.getEmail());
+        log.debug("회원가입 시도: {}", maskEmail(request.getEmail()));
 
         if (requireEmailVerification && !emailService.isEmailVerified(request.getEmail())) {
             throw new CustomException(ErrorCode.EMAIL_NOT_VERIFIED);
@@ -44,7 +46,7 @@ public class UserRegistrationService {
         if (requireEmailVerification) {
             emailService.deleteVerifiedFlag(request.getEmail());
         }
-        log.info("회원가입 성공: userId={}, email={}", user.getId(), user.getEmail());
+        log.info("회원가입 성공: userId={}, email={}", user.getId(), maskEmail(user.getEmail()));
     }
 
     private void validateDuplicateEmail(String email) {

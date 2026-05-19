@@ -3,7 +3,7 @@ package com.kangaroo.sparring.domain.insight.weekly.service;
 import com.kangaroo.sparring.domain.insight.weekly.dto.internal.HighlightEvidence;
 import com.kangaroo.sparring.domain.insight.weekly.dto.internal.ImprovementEvidence;
 import com.kangaroo.sparring.domain.insight.weekly.dto.internal.ReportEvidence;
-import com.kangaroo.sparring.domain.recommendation.service.GeminiApiClient;
+import com.kangaroo.sparring.global.client.GeminiApiClient;
 import com.kangaroo.sparring.global.exception.CustomException;
 import com.kangaroo.sparring.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -34,6 +34,8 @@ public class ReportGeminiService {
     // ── AI 종합 코멘트 ──────────────────────────────────────────────────────────
 
     public String generateComment(ReportEvidence evidence) {
+        long startedAt = System.currentTimeMillis();
+        log.info("Gemini 주간 코멘트 생성 시작: score={}", evidence.score().overallScore());
         try {
             String template = loadTemplate(commentPromptResource);
             String prompt = template
@@ -49,7 +51,10 @@ public class ReportGeminiService {
                     .replace("{highlightsSummary}", summarizeHighlights(evidence.highlights()))
                     .replace("{improvementSummary}", summarizeImprovement(evidence.improvement()));
 
-            return geminiApiClient.generateContent(prompt).strip();
+            String comment = geminiApiClient.generateContent(prompt).strip();
+            log.info("Gemini 주간 코멘트 생성 성공: score={}, elapsedMs={}",
+                    evidence.score().overallScore(), System.currentTimeMillis() - startedAt);
+            return comment;
         } catch (CustomException e) {
             log.warn("보고서 AI 코멘트 생성 실패, fallback 사용: score={}", evidence.score().overallScore());
             return generateFallbackComment(evidence.score().overallScore());
@@ -59,6 +64,8 @@ public class ReportGeminiService {
     // ── 개선 방법 ───────────────────────────────────────────────────────────────
 
     public String generateImprovementTips(ImprovementEvidence improvement) {
+        long startedAt = System.currentTimeMillis();
+        log.info("Gemini 개선 방법 생성 시작: category={}", improvement.category());
         try {
             String template = loadTemplate(improvementPromptResource);
             String prompt = template
@@ -67,7 +74,10 @@ public class ReportGeminiService {
                     .replace("{detail}", improvement.detail())
                     .replace("{factsSummary}", summarizeFacts(improvement.facts()));
 
-            return geminiApiClient.generateContent(prompt).strip();
+            String tips = geminiApiClient.generateContent(prompt).strip();
+            log.info("Gemini 개선 방법 생성 성공: category={}, elapsedMs={}",
+                    improvement.category(), System.currentTimeMillis() - startedAt);
+            return tips;
         } catch (CustomException e) {
             log.warn("보고서 개선 방법 생성 실패, fallback 사용: category={}", improvement.category());
             return generateFallbackTips(improvement.category().name());

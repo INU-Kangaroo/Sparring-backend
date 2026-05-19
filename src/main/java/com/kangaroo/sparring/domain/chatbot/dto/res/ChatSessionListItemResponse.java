@@ -1,7 +1,7 @@
 package com.kangaroo.sparring.domain.chatbot.dto.res;
 
-import com.kangaroo.sparring.domain.chatbot.session.ChatMessage;
-import com.kangaroo.sparring.domain.chatbot.session.ChatSession;
+import com.kangaroo.sparring.domain.chatbot.entity.ChatMessage;
+import com.kangaroo.sparring.domain.chatbot.entity.ChatSession;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
 import lombok.Builder;

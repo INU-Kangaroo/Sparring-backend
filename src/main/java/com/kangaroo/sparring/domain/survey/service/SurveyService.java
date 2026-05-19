@@ -10,7 +10,7 @@ import com.kangaroo.sparring.domain.survey.dto.res.SurveySubmitResponse;
 
 import com.kangaroo.sparring.domain.healthprofile.entity.HealthProfile;
 import com.kangaroo.sparring.domain.healthprofile.service.HealthProfileService;
-import com.kangaroo.sparring.domain.healthprofile.support.HealthProfileFieldSupport;
+import com.kangaroo.sparring.domain.healthprofile.HealthProfileFieldSupport;
 import com.kangaroo.sparring.domain.healthprofile.repository.HealthProfileRepository;
 import com.kangaroo.sparring.domain.survey.entity.*;
 import com.kangaroo.sparring.domain.survey.repository.AnswerRepository;
@@ -18,6 +18,7 @@ import com.kangaroo.sparring.domain.survey.repository.QuestionRepository;
 import com.kangaroo.sparring.domain.survey.repository.SurveyRepository;
 import com.kangaroo.sparring.domain.user.entity.User;
 import com.kangaroo.sparring.domain.user.repository.UserRepository;
+import com.kangaroo.sparring.domain.user.service.UserLookupService;
 import com.kangaroo.sparring.global.exception.CustomException;
 import com.kangaroo.sparring.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -42,6 +43,7 @@ public class SurveyService {
     private final AnswerRepository answerRepository;
     private final HealthProfileRepository healthProfileRepository;
     private final UserRepository userRepository;
+    private final UserLookupService userLookupService;
     private final SurveyAnswerValidator surveyAnswerValidator;
     private final HealthProfileService healthProfileService;
 
@@ -49,6 +51,8 @@ public class SurveyService {
      * 설문 문항 조회
      */
     public SurveyQuestionsResponse getSurveyQuestions() {
+        long startedAt = System.currentTimeMillis();
+        log.info("설문 문항 조회 시작");
         surveyRepository.findBySurveyType(SurveyType.SURVEY)
                 .orElseThrow(() -> new CustomException(ErrorCode.SURVEY_NOT_FOUND));
         List<Question> questions = questionRepository.findBySurveyType(SurveyType.SURVEY);
@@ -62,7 +66,10 @@ public class SurveyService {
                 .map(QuestionResponse::from)
                 .collect(Collectors.toList());
 
-        return SurveyQuestionsResponse.from(responses);
+        SurveyQuestionsResponse response = SurveyQuestionsResponse.from(responses);
+        log.info("설문 문항 조회 완료: questionCount={}, elapsedMs={}",
+                responses.size(), System.currentTimeMillis() - startedAt);
+        return response;
     }
 
     /**
@@ -70,8 +77,12 @@ public class SurveyService {
      */
     @Transactional
     public SurveySubmitResponse submitSurvey(Long userId, SurveySubmitRequest request) {
+        long startedAt = System.currentTimeMillis();
+        int submittedAnswers = request.getAnswers() == null ? 0 : request.getAnswers().size();
+        log.info("설문 제출 시작: userId={}, answers={}", userId, submittedAnswers);
         // 이미 완료한 설문인지 확인
         if (answerRepository.existsByUserIdAndSurveyType(userId, SurveyType.SURVEY)) {
+            log.warn("설문 제출 차단: 이미 완료됨 userId={}", userId);
             throw new CustomException(ErrorCode.SURVEY_ALREADY_COMPLETED);
         }
 
@@ -86,8 +97,7 @@ public class SurveyService {
         surveyAnswerValidator.validateSubmittedAnswers(request.getAnswers(), questionMap);
 
         // User 조회
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+        User user = userLookupService.getUserOrThrow(userId);
 
         // 답변 저장
         List<Answer> answers = request.getAnswers().stream()
@@ -110,6 +120,8 @@ public class SurveyService {
         // HealthProfile 생성 또는 업데이트
         updateHealthProfile(userId, SurveyType.SURVEY, answers);
 
+        log.info("설문 제출 완료: userId={}, savedAnswers={}, elapsedMs={}",
+                userId, answers.size(), System.currentTimeMillis() - startedAt);
         return SurveySubmitResponse.of();
     }
 
@@ -118,6 +130,8 @@ public class SurveyService {
      */
     @Transactional
     public AnswerResponse updateAnswer(Long userId, UpdateAnswerRequest request) {
+        long startedAt = System.currentTimeMillis();
+        log.info("설문 답변 수정 시작: userId={}, questionKey={}", userId, request.getQuestionKey());
         Question question = questionRepository
                 .findByQuestionKeyAndSurveyType(
                         request.getQuestionKey(),
@@ -133,16 +147,22 @@ public class SurveyService {
         // HealthProfile 업데이트
         updateHealthProfileFromSingleAnswer(userId, answer);
 
-        return AnswerResponse.from(answer);
+        AnswerResponse response = AnswerResponse.from(answer);
+        log.info("설문 답변 수정 완료: userId={}, questionKey={}, elapsedMs={}",
+                userId, request.getQuestionKey(), System.currentTimeMillis() - startedAt);
+        return response;
     }
 
     /**
      * 설문 응답 조회
      */
     public SurveyAnswersResponse getSurveyAnswers(Long userId) {
+        long startedAt = System.currentTimeMillis();
+        log.info("설문 응답 조회 시작: userId={}", userId);
         List<Answer> answers = answerRepository.findByUserIdAndSurveyType(userId, SurveyType.SURVEY);
 
         if (answers.isEmpty()) {
+            log.warn("설문 응답 조회 실패: 미완료 userId={}", userId);
             throw new CustomException(ErrorCode.SURVEY_NOT_COMPLETED);
         }
 
@@ -150,14 +170,19 @@ public class SurveyService {
                 .map(AnswerResponse::from)
                 .collect(Collectors.toList());
 
-        return SurveyAnswersResponse.of(answerResponses);
+        SurveyAnswersResponse response = SurveyAnswersResponse.of(answerResponses);
+        log.info("설문 응답 조회 완료: userId={}, answers={}, elapsedMs={}",
+                userId, answerResponses.size(), System.currentTimeMillis() - startedAt);
+        return response;
     }
 
     /**
      * 설문 완료 여부 확인
      */
     public Boolean checkSurveyCompleted(Long userId) {
-        return answerRepository.existsByUserIdAndSurveyType(userId, SurveyType.SURVEY);
+        boolean completed = answerRepository.existsByUserIdAndSurveyType(userId, SurveyType.SURVEY);
+        log.debug("설문 완료 여부 조회: userId={}, completed={}", userId, completed);
+        return completed;
     }
 
     /**

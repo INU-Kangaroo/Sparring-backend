@@ -13,6 +13,8 @@ import org.springframework.stereotype.Component;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 
+import static com.kangaroo.sparring.global.support.LogMaskingSupport.maskEmail;
+
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -39,10 +41,10 @@ public class EmailAsyncSender {
             );
 
             mailSender.send(message);
-            log.info("이메일 발송 완료: {}", toEmail);
+            log.info("이메일 발송 완료: {}", maskEmail(toEmail));
             return CompletableFuture.completedFuture(null);
         } catch (Exception e) {
-            log.error("이메일 비동기 발송 실패: {}", toEmail, e);
+            log.error("이메일 비동기 발송 실패: {}", maskEmail(toEmail), e);
             throw new CompletionException(new CustomException(ErrorCode.EMAIL_SEND_FAILED));
         }
     }

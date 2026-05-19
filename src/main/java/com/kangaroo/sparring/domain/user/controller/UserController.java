@@ -4,6 +4,7 @@ import com.kangaroo.sparring.domain.user.dto.req.ChangePasswordRequest;
 import com.kangaroo.sparring.domain.user.dto.req.DeleteAccountRequest;
 import com.kangaroo.sparring.domain.user.dto.req.UpdateUserProfileRequest;
 import com.kangaroo.sparring.domain.user.dto.res.UserDashboardResponse;
+import com.kangaroo.sparring.domain.user.dto.res.UserHomeCardResponse;
 import com.kangaroo.sparring.domain.user.dto.res.UserProfileResponse;
 import com.kangaroo.sparring.domain.user.service.UserAccountService;
 import com.kangaroo.sparring.domain.user.service.UserProfileService;
@@ -47,6 +48,63 @@ public class UserController {
     ) {
         Long userId = PrincipalResolver.resolveUserId(principal);
         return ResponseEntity.ok(userProfileService.getDashboard(userId));
+    }
+
+    @Operation(summary = "메인 홈 카드 조회", description = "메인 화면 상단 프로필 카드용 정보 조회")
+    @ApiResponses({
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "OK",
+                    content = @Content(
+                            mediaType = "application/json",
+                            examples = {
+                                    @ExampleObject(
+                                            name = "FullData",
+                                            value = """
+                                                    {
+                                                      "name": "홍길동",
+                                                      "profileImageUrl": "https://cdn.example.com/profile/1.png",
+                                                      "displayDate": "2026년 4월 8일 수요일",
+                                                      "tags": ["23세", "여성", "제2형 당뇨", "고혈압 경계성"],
+                                                      "tagCandidates": [
+                                                        {"type": "AGE", "label": "23세"},
+                                                        {"type": "GENDER", "label": "여성"},
+                                                        {"type": "BLOOD_SUGAR", "label": "제2형 당뇨"},
+                                                        {"type": "BLOOD_PRESSURE", "label": "고혈압 경계성"},
+                                                        {"type": "EXERCISE", "label": "주 3~4회 운동"},
+                                                        {"type": "SLEEP", "label": "평균 수면 6.5시간"},
+                                                        {"type": "SMOKING", "label": "비흡연"},
+                                                        {"type": "DRINKING", "label": "주 1~2회 음주"},
+                                                        {"type": "MEDICATION", "label": "복용약 있음"},
+                                                        {"type": "ALLERGY", "label": "알레르기 있음"}
+                                                      ]
+                                                    }
+                                                    """
+                                    ),
+                                    @ExampleObject(
+                                            name = "MinimalData",
+                                            value = """
+                                                    {
+                                                      "name": "홍길동",
+                                                      "profileImageUrl": null,
+                                                      "displayDate": "2026년 4월 8일 수요일",
+                                                      "tags": ["23세"],
+                                                      "tagCandidates": [
+                                                        {"type": "AGE", "label": "23세"}
+                                                      ]
+                                                    }
+                                                    """
+                                    )
+                            }
+                    )
+            )
+    })
+    @GetMapping("/home-card")
+    public ResponseEntity<UserHomeCardResponse> getHomeCard(
+            @AuthenticationPrincipal UserIdPrincipal principal
+    ) {
+        Long userId = PrincipalResolver.resolveUserId(principal);
+        return ResponseEntity.ok(userProfileService.getHomeCard(userId));
     }
 
     @Operation(summary = "프로필 수정", description = "이름/생년월일/성별/키/몸무게/프로필 이미지 수정")

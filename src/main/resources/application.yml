@@ -133,14 +133,20 @@ springdoc:
 # Gemini API Configuration
 gemini:
   api:
-    key: ${GEMINI_API_KEY}
+    keys:
+      - ${GEMINI_API_KEY_1:}
+      - ${GEMINI_API_KEY_2:}
+      - ${GEMINI_API_KEY_3:}
     url: ${GEMINI_API_URL}
 
 # ML Server Configuration
 ml:
-  server:
-    url: ${ML_SERVER_URL}
-    recommend-path: ${ML_RECOMMEND_PATH:/recommend}
+  recommendation:
+    url: ${ML_RECOMMEND_URL}
+    path: ${ML_RECOMMEND_PATH:/api/v1/recommendations}
+  prediction:
+    url: ${ML_PREDICT_URL}
+    path: ${ML_PREDICT_PATH:/predict-glucose}
 
 # Report Scoring Policy
 report:

@@ -9,6 +9,7 @@ import com.kangaroo.sparring.domain.record.food.entity.FoodLog;
 import com.kangaroo.sparring.domain.record.food.repository.FoodLogRepository;
 import com.kangaroo.sparring.domain.user.entity.User;
 import com.kangaroo.sparring.domain.user.repository.UserRepository;
+import com.kangaroo.sparring.domain.user.service.UserLookupService;
 import com.kangaroo.sparring.global.exception.CustomException;
 import com.kangaroo.sparring.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -32,6 +33,7 @@ public class FoodLogService {
     private final FoodLogRepository foodLogRepository;
     private final FoodRepository foodRepository;
     private final UserRepository userRepository;
+    private final UserLookupService userLookupService;
     private final Clock kstClock;
 
     @Transactional
@@ -39,7 +41,7 @@ public class FoodLogService {
         log.info("식사 기록 등록 시작: userId={}, foodId={}, eatenAmountGram={}",
                 userId, request.getFoodId(), request.getEatenAmountGram());
 
-        User user = findUserById(userId);
+        User user = userLookupService.getUserOrThrow(userId);
         Food food = foodRepository.findByIdWithNutrition(request.getFoodId())
                 .orElseThrow(() -> new CustomException(ErrorCode.FOOD_NOT_FOUND));
 
@@ -71,10 +73,5 @@ public class FoodLogService {
             throw new CustomException(ErrorCode.LOG_ACCESS_DENIED);
         }
         foodLog.delete();
-    }
-
-    private User findUserById(Long userId) {
-        return userRepository.findById(userId)
-                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
     }
 }

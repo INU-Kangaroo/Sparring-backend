@@ -16,7 +16,7 @@ import java.util.Optional;
 public class ExerciseMatcher {
 
     private static final double MET_LOW    = 3.5;
-    private static final double MET_MEDIUM = 5.0;
+    private static final double MET_MODERATE = 5.0;
     private static final double MET_HIGH   = 8.0;
 
     private final ExerciseRepository exerciseRepository;
@@ -74,7 +74,7 @@ public class ExerciseMatcher {
     private double getFallbackMet(ExerciseIntensity intensity) {
         return switch (intensity) {
             case LOW    -> MET_LOW;
-            case MEDIUM -> MET_MEDIUM;
+            case MODERATE -> MET_MODERATE;
             case HIGH   -> MET_HIGH;
         };
     }

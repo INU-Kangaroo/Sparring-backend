@@ -1,8 +1,8 @@
 package com.kangaroo.sparring.domain.insight.weekly.service;
 
 import com.kangaroo.sparring.domain.common.health.HealthThresholds;
-import com.kangaroo.sparring.domain.record.common.read.BloodPressureRecord;
-import com.kangaroo.sparring.domain.record.common.read.BloodSugarRecord;
+import com.kangaroo.sparring.domain.record.common.BloodPressureRecord;
+import com.kangaroo.sparring.domain.record.common.BloodSugarRecord;
 
 import java.util.List;
 

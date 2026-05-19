@@ -4,7 +4,7 @@ import com.kangaroo.sparring.domain.common.BaseEntity;
 import com.kangaroo.sparring.domain.common.type.ExerciseDuration;
 import com.kangaroo.sparring.domain.user.type.Gender;
 import com.kangaroo.sparring.domain.user.entity.User;
-import com.kangaroo.sparring.domain.healthprofile.support.HealthProfileFieldSupport;
+import com.kangaroo.sparring.domain.healthprofile.HealthProfileFieldSupport;
 import com.kangaroo.sparring.domain.survey.type.*;
 import jakarta.persistence.*;
 import lombok.*;

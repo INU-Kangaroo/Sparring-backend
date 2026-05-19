@@ -12,13 +12,13 @@ import java.util.List;
 public class ExerciseRecommendationResponse {
 
     @Schema(description = "유산소 운동 목록")
-    private List<CardiacExerciseDto> cardiacExercises;
+    private List<CardiacExerciseResponse> cardiacExercises;
 
     @Schema(description = "근력 운동 목록")
-    private List<StrengthExerciseDto> strengthExercises;
+    private List<StrengthExerciseResponse> strengthExercises;
 
-    public static ExerciseRecommendationResponse of(List<CardiacExerciseDto> cardiacExercises,
-                                                    List<StrengthExerciseDto> strengthExercises) {
+    public static ExerciseRecommendationResponse of(List<CardiacExerciseResponse> cardiacExercises,
+                                                    List<StrengthExerciseResponse> strengthExercises) {
         return ExerciseRecommendationResponse.builder()
                 .cardiacExercises(cardiacExercises)
                 .strengthExercises(strengthExercises)

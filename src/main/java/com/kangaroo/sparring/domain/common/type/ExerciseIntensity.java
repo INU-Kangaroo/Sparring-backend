@@ -7,7 +7,7 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public enum ExerciseIntensity {
     LOW("저강도"),
-    MEDIUM("중강도"),
+    MODERATE("중강도"),
     HIGH("고강도");
 
     private final String description;

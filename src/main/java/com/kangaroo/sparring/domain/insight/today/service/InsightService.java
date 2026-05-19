@@ -4,12 +4,13 @@ import com.kangaroo.sparring.domain.insight.today.dto.res.TodayInsightResponse;
 import com.kangaroo.sparring.domain.insight.today.service.InsightContextBuilder.InsightContext;
 import com.kangaroo.sparring.domain.insight.today.type.InsightType;
 import com.kangaroo.sparring.domain.insight.today.type.MealTimeSlot;
-import com.kangaroo.sparring.domain.recommendation.service.GeminiApiClient;
+import com.kangaroo.sparring.global.client.GeminiApiClient;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.Optional;
@@ -24,14 +25,15 @@ public class InsightService {
     private final InsightPromptSupport insightPromptSupport;
     private final InsightCacheService insightCacheService;
     private final GeminiApiClient geminiApiClient;
+    private final Clock kstClock;
 
     public TodayInsightResponse getTodayInsight(Long userId) {
-        LocalTime now = LocalTime.now();
+        LocalTime now = LocalTime.now(kstClock);
         MealTimeSlot slot = MealTimeSlot.from(now);
 
         String cacheKey = insightCacheService.buildKey(
                 userId,
-                LocalDate.now().toString(),
+                LocalDate.now(kstClock).toString(),
                 slot.cacheKey()
         );
 
@@ -48,8 +50,12 @@ public class InsightService {
         String prompt = insightPromptSupport.build(context, slot);
 
         String message;
+        long startedAt = System.currentTimeMillis();
+        log.info("Gemini 인사이트 생성 시작: userId={}, slot={}, type={}", userId, slot, context.getType());
         try {
             message = geminiApiClient.generateContent(prompt).strip();
+            log.info("Gemini 인사이트 생성 성공: userId={}, slot={}, type={}, elapsedMs={}",
+                    userId, slot, context.getType(), System.currentTimeMillis() - startedAt);
         } catch (Exception e) {
             log.warn("Gemini 인사이트 생성 실패, fallback 메시지 사용: userId={}", userId, e);
             message = getFallbackMessage(context.getType());

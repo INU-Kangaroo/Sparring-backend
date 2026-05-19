@@ -11,6 +11,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import static com.kangaroo.sparring.global.support.LogMaskingSupport.maskEmail;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -18,19 +20,20 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserAccountService {
 
     private final UserRepository userRepository;
+    private final UserLookupService userLookupService;
     private final PasswordEncoder passwordEncoder;
     private final RefreshTokenService refreshTokenService;
 
     @Transactional
     public void updateEmail(Long userId, String email) {
-        User user = getUserOrThrow(userId);
+        User user = userLookupService.getUserOrThrow(userId);
         validateDuplicateEmail(email);
         user.updateEmail(email);
-        log.info("이메일 변경 완료: userId={}, email={}", userId, email);
+        log.info("이메일 변경 완료: userId={}, email={}", userId, maskEmail(email));
     }
 
     public String getEmailOrThrow(Long userId) {
-        return getUserOrThrow(userId).getEmail();
+        return userLookupService.getUserOrThrow(userId).getEmail();
     }
 
     @Transactional
@@ -39,7 +42,7 @@ public class UserAccountService {
             throw new CustomException(ErrorCode.INVALID_PASSWORD_CONFIRM);
         }
 
-        User user = getUserOrThrow(userId);
+        User user = userLookupService.getUserOrThrow(userId);
         if (user.isSocialUser()) {
             throw new CustomException(ErrorCode.PASSWORD_CHANGE_NOT_ALLOWED);
         }
@@ -56,7 +59,7 @@ public class UserAccountService {
 
     @Transactional
     public void deleteAccount(Long userId, String password) {
-        User user = getUserOrThrow(userId);
+        User user = userLookupService.getUserOrThrow(userId);
 
         if (!user.isSocialUser()) {
             if (password == null || password.isBlank()) {
@@ -71,11 +74,6 @@ public class UserAccountService {
         refreshTokenService.deleteRefreshToken(userId);
         refreshTokenService.revokeAccessTokens(userId);
         log.info("회원 탈퇴 처리 완료: userId={}", userId);
-    }
-
-    private User getUserOrThrow(Long userId) {
-        return userRepository.findById(userId)
-                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
     }
 
     private void validateDuplicateEmail(String email) {

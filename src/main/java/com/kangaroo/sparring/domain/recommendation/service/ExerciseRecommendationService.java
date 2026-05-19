@@ -2,15 +2,15 @@ package com.kangaroo.sparring.domain.recommendation.service;
 
 import com.kangaroo.sparring.domain.catalog.service.ExerciseCandidateService;
 import com.kangaroo.sparring.domain.catalog.entity.Exercise;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kangaroo.sparring.domain.healthprofile.entity.HealthProfile;
-import com.kangaroo.sparring.domain.record.common.read.BloodPressureRecord;
-import com.kangaroo.sparring.domain.record.common.read.BloodSugarRecord;
+import com.kangaroo.sparring.domain.healthprofile.service.HealthProfileService;
+import com.kangaroo.sparring.domain.record.common.BloodPressureRecord;
+import com.kangaroo.sparring.domain.record.common.BloodSugarRecord;
+import com.kangaroo.sparring.domain.record.common.RecordReadService;
 import com.kangaroo.sparring.domain.recommendation.dto.req.ExerciseRecommendationRequest;
-import com.kangaroo.sparring.domain.recommendation.dto.res.CardiacExerciseDto;
+import com.kangaroo.sparring.domain.recommendation.dto.res.CardiacExerciseResponse;
 import com.kangaroo.sparring.domain.recommendation.dto.res.ExerciseRecommendationResponse;
-import com.kangaroo.sparring.domain.recommendation.dto.res.StrengthExerciseDto;
+import com.kangaroo.sparring.domain.recommendation.dto.res.StrengthExerciseResponse;
 import com.kangaroo.sparring.domain.recommendation.entity.ExerciseRecommendation;
 import com.kangaroo.sparring.domain.recommendation.entity.Recommendation;
 import com.kangaroo.sparring.domain.recommendation.repository.ExerciseRecommendationRepository;
@@ -18,43 +18,42 @@ import com.kangaroo.sparring.domain.recommendation.repository.RecommendationRepo
 import com.kangaroo.sparring.domain.recommendation.type.ExerciseType;
 import com.kangaroo.sparring.domain.recommendation.type.RecommendationType;
 import com.kangaroo.sparring.domain.user.entity.User;
+import com.kangaroo.sparring.domain.user.repository.UserRepository;
+import com.kangaroo.sparring.domain.user.service.UserLookupService;
 import com.kangaroo.sparring.global.exception.CustomException;
 import com.kangaroo.sparring.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class ExerciseRecommendationService {
-    private static final Pattern RANGE_NUMBER_FIELD_PATTERN =
-            Pattern.compile("(\"[^\"]+\"\\s*:\\s*)(\\d+\\s*-\\s*\\d+)(\\s*[,}])");
-
     private static final int CACHE_HOURS = 24;
     private static final int RECENT_MEASUREMENT_COUNT = 7;
 
     private final RecommendationRepository recommendationRepository;
     private final ExerciseRecommendationRepository exerciseRecommendationRepository;
-    private final GeminiApiClient geminiApiClient;
-    private final ObjectMapper objectMapper;
-    private final RecommendationPersistenceService recommendationPersistenceService;
+    private final ExerciseRecommendationAiClient exerciseRecommendationAiClient;
     private final RecommendationPromptTemplateService promptTemplateService;
-    private final RecommendationContextService recommendationContextService;
     private final RecommendationJsonMappingSupport jsonMappingSupport;
     private final ExerciseCandidateService exerciseCandidateService;
+    private final UserRepository userRepository;
+    private final UserLookupService userLookupService;
+    private final HealthProfileService healthProfileService;
+    private final RecordReadService recordReadService;
+    private final Clock kstClock;
 
     public ExerciseRecommendationResponse getExerciseRecommendations(Long userId, ExerciseRecommendationRequest request) {
-        User user = recommendationContextService.getUser(userId);
-        LocalDateTime cacheThreshold = LocalDateTime.now().minusHours(CACHE_HOURS);
-
+        User user = userLookupService.getUserOrThrow(userId);
+        LocalDateTime cacheThreshold = LocalDateTime.now(kstClock).minusHours(CACHE_HOURS);
         return recommendationRepository
                 .findCachedExerciseRecommendation(
                         user.getId(),
@@ -64,21 +63,31 @@ public class ExerciseRecommendationService {
                         request.getLocation().name(),
                         cacheThreshold
                 )
-                .map(this::buildExerciseRecommendationResponse)
-                .orElseGet(() -> generateNewExerciseRecommendations(user, request));
+                .map(cached -> {
+                    log.info("운동 추천 캐시 반환: userId={}, duration={}, intensity={}, location={}",
+                            user.getId(), request.getDuration().name(), request.getIntensity().name(), request.getLocation().name());
+                    return buildExerciseRecommendationResponse(cached);
+                })
+                .orElseGet(() -> {
+                    log.info("운동 추천 캐시 미스, 신규 생성: userId={}, duration={}, intensity={}, location={}",
+                            user.getId(), request.getDuration().name(), request.getIntensity().name(), request.getLocation().name());
+                    return generateNewExerciseRecommendations(user, request);
+                });
     }
 
     public ExerciseRecommendationResponse refreshExerciseRecommendations(Long userId, ExerciseRecommendationRequest request) {
-        User user = recommendationContextService.getUser(userId);
+        User user = userLookupService.getUserOrThrow(userId);
+        log.info("운동 추천 강제 새로고침 요청: userId={}, duration={}, intensity={}, location={}",
+                user.getId(), request.getDuration().name(), request.getIntensity().name(), request.getLocation().name());
         return generateNewExerciseRecommendations(user, request);
     }
 
     private ExerciseRecommendationResponse generateNewExerciseRecommendations(User user, ExerciseRecommendationRequest request) {
-        HealthProfile healthProfile = recommendationContextService.getOrCreateHealthProfile(user.getId());
+        HealthProfile healthProfile = healthProfileService.getOrCreateHealthProfile(user.getId());
         List<BloodSugarRecord> recentBloodSugars =
-                recommendationContextService.getRecentBloodSugars(user.getId(), RECENT_MEASUREMENT_COUNT);
+                recordReadService.getRecentBloodSugarRecords(user.getId(), RECENT_MEASUREMENT_COUNT);
         List<BloodPressureRecord> recentBloodPressures =
-                recommendationContextService.getRecentBloodPressures(user.getId(), RECENT_MEASUREMENT_COUNT);
+                recordReadService.getRecentBloodPressureRecords(user.getId(), RECENT_MEASUREMENT_COUNT);
 
         // 마스터 테이블 필터링으로 후보 생성
         List<Exercise> candidates = exerciseCandidateService.findCandidates(
@@ -87,8 +96,7 @@ public class ExerciseRecommendationService {
         String candidatesText = exerciseCandidateService.buildCandidatesText(candidates);
 
         String prompt = buildExercisePrompt(healthProfile, recentBloodSugars, recentBloodPressures, request, candidatesText);
-        String geminiResponse = geminiApiClient.generateContent(prompt);
-        ExerciseRecommendationResponse response = parseExerciseResponse(geminiResponse);
+        ExerciseRecommendationResponse response = exerciseRecommendationAiClient.recommend(prompt);
 
         Recommendation recommendation = Recommendation.createExerciseRecommendation(
                 user,
@@ -96,10 +104,11 @@ public class ExerciseRecommendationService {
                 request.getIntensity().name(),
                 request.getLocation().name()
         );
-        recommendationPersistenceService.persistExerciseRecommendation(
-                recommendation,
-                buildExerciseEntities(recommendation, response)
-        );
+        recommendationRepository.save(recommendation);
+        List<ExerciseRecommendation> exercises = buildExerciseEntities(recommendation, response);
+        if (!exercises.isEmpty()) {
+            exerciseRecommendationRepository.saveAll(exercises);
+        }
 
         log.info("새로운 운동 추천 생성 완료: userId={}", user.getId());
         return response;
@@ -110,7 +119,7 @@ public class ExerciseRecommendationService {
                                        List<BloodPressureRecord> bloodPressures,
                                        ExerciseRecommendationRequest request,
                                        String candidatesText) {
-        String userHealthInfo = RecommendationPromptSupport.buildUserHealthInfo(healthProfile, bloodSugars, bloodPressures);
+        String userHealthInfo = promptTemplateService.buildUserHealthInfo(healthProfile, bloodSugars, bloodPressures);
         return promptTemplateService.renderExercisePrompt(Map.of(
                 "USER_HEALTH_INFO", userHealthInfo,
                 "DURATION", request.getDuration().getDescription(),
@@ -120,52 +129,10 @@ public class ExerciseRecommendationService {
         ));
     }
 
-    private ExerciseRecommendationResponse parseExerciseResponse(String geminiResponse) {
-        try {
-            String sanitizedJson = sanitizeRangeNumberFields(RecommendationJsonSupport.extractJsonObject(geminiResponse));
-            JsonNode root = jsonMappingSupport.readTreeOrThrow(sanitizedJson, geminiResponse, "Gemini 운동 추천 응답");
-
-            List<CardiacExerciseDto> cardiacExercises = new ArrayList<>();
-            JsonNode cardiacNode = root.path("cardiacExercises");
-            if (cardiacNode.isArray()) {
-                for (JsonNode node : cardiacNode) {
-                    CaloriesRange caloriesRange = parseCaloriesRange(node);
-                    cardiacExercises.add(CardiacExerciseDto.of(
-                            node.path("name").asText(),
-                            node.path("duration").asText(),
-                            caloriesRange.minCalories(),
-                            caloriesRange.maxCalories(),
-                            jsonMappingSupport.readPrecautions(node)
-                    ));
-                }
-            }
-
-            List<StrengthExerciseDto> strengthExercises = new ArrayList<>();
-            JsonNode strengthNode = root.path("strengthExercises");
-            if (strengthNode.isArray()) {
-                for (JsonNode node : strengthNode) {
-                    strengthExercises.add(StrengthExerciseDto.of(
-                            node.path("name").asText(),
-                            node.path("duration").asText(),
-                            node.path("frequency").asText(),
-                            jsonMappingSupport.readPrecautions(node)
-                    ));
-                }
-            }
-
-            return ExerciseRecommendationResponse.of(cardiacExercises, strengthExercises);
-        } catch (CustomException e) {
-            throw e;
-        } catch (Exception e) {
-            log.error("운동 추천 처리 실패: body={}", RecommendationJsonSupport.abbreviate(geminiResponse), e);
-            throw new CustomException(ErrorCode.INTERNAL_SERVER_ERROR);
-        }
-    }
-
     private List<ExerciseRecommendation> buildExerciseEntities(Recommendation recommendation, ExerciseRecommendationResponse response) {
         List<ExerciseRecommendation> exercises = new ArrayList<>();
 
-        for (CardiacExerciseDto dto : response.getCardiacExercises()) {
+        for (CardiacExerciseResponse dto : response.getCardiacExercises()) {
             exercises.add(ExerciseRecommendation.of(
                     recommendation,
                     ExerciseType.CARDIAC,
@@ -178,7 +145,7 @@ public class ExerciseRecommendationService {
             ));
         }
 
-        for (StrengthExerciseDto dto : response.getStrengthExercises()) {
+        for (StrengthExerciseResponse dto : response.getStrengthExercises()) {
             exercises.add(ExerciseRecommendation.of(
                     recommendation,
                     ExerciseType.STRENGTH,
@@ -197,9 +164,9 @@ public class ExerciseRecommendationService {
     private ExerciseRecommendationResponse buildExerciseRecommendationResponse(Recommendation recommendation) {
         List<ExerciseRecommendation> exercises = exerciseRecommendationRepository.findByRecommendationOrderByIdAsc(recommendation);
 
-        List<CardiacExerciseDto> cardiacExercises = exercises.stream()
+        List<CardiacExerciseResponse> cardiacExercises = exercises.stream()
                 .filter(e -> e.getExerciseType() == ExerciseType.CARDIAC)
-                .map(e -> CardiacExerciseDto.of(
+                .map(e -> CardiacExerciseResponse.of(
                         e.getName(),
                         e.getDuration(),
                         e.getMinCalories(),
@@ -208,9 +175,9 @@ public class ExerciseRecommendationService {
                 ))
                 .toList();
 
-        List<StrengthExerciseDto> strengthExercises = exercises.stream()
+        List<StrengthExerciseResponse> strengthExercises = exercises.stream()
                 .filter(e -> e.getExerciseType() == ExerciseType.STRENGTH)
-                .map(e -> StrengthExerciseDto.of(
+                .map(e -> StrengthExerciseResponse.of(
                         e.getName(),
                         e.getDuration(),
                         e.getFrequency(),
@@ -219,67 +186,5 @@ public class ExerciseRecommendationService {
                 .toList();
 
         return ExerciseRecommendationResponse.of(cardiacExercises, strengthExercises);
-    }
-
-    private String sanitizeRangeNumberFields(String json) {
-        Matcher matcher = RANGE_NUMBER_FIELD_PATTERN.matcher(json);
-        StringBuffer result = new StringBuffer();
-        while (matcher.find()) {
-            String replacement = matcher.group(1) + "\"" + matcher.group(2).replace(" ", "") + "\"" + matcher.group(3);
-            matcher.appendReplacement(result, Matcher.quoteReplacement(replacement));
-        }
-        matcher.appendTail(result);
-        return result.toString();
-    }
-
-    private CaloriesRange parseCaloriesRange(JsonNode node) {
-        Integer min = parseNullableInt(node.path("minCalories"));
-        Integer max = parseNullableInt(node.path("maxCalories"));
-
-        if (min == null && max == null) {
-            String rawCalories = node.path("calories").asText("");
-            List<Integer> numbers = extractNumbers(rawCalories);
-            if (numbers.size() >= 2) {
-                min = numbers.get(0);
-                max = numbers.get(1);
-            } else if (numbers.size() == 1) {
-                min = numbers.get(0);
-                max = numbers.get(0);
-            }
-        }
-
-        if (min == null && max != null) {
-            min = max;
-        } else if (min != null && max == null) {
-            max = min;
-        }
-
-        return new CaloriesRange(min, max);
-    }
-
-    private Integer parseNullableInt(JsonNode node) {
-        if (node == null || node.isMissingNode() || node.isNull()) {
-            return null;
-        }
-        if (node.isInt() || node.isLong()) {
-            return node.asInt();
-        }
-        List<Integer> numbers = extractNumbers(node.asText(""));
-        return numbers.isEmpty() ? null : numbers.get(0);
-    }
-
-    private List<Integer> extractNumbers(String raw) {
-        List<Integer> numbers = new ArrayList<>();
-        if (raw == null || raw.isBlank()) {
-            return numbers;
-        }
-        Matcher matcher = Pattern.compile("\\d+").matcher(raw);
-        while (matcher.find()) {
-            numbers.add(Integer.parseInt(matcher.group()));
-        }
-        return numbers;
-    }
-
-    private record CaloriesRange(Integer minCalories, Integer maxCalories) {
     }
 }

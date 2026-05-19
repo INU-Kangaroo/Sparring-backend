@@ -3,10 +3,10 @@ spring:
     activate:
       on-profile: dev
   flyway:
-    enabled: false
+    enabled: true
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: validate
     properties:
       hibernate:
         format_sql: true

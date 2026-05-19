@@ -9,29 +9,30 @@ import com.kangaroo.sparring.domain.auth.dto.req.SignupRequest;
 import com.kangaroo.sparring.domain.auth.dto.req.VerifyCodeRequest;
 import com.kangaroo.sparring.domain.auth.dto.res.AuthResponse;
 import com.kangaroo.sparring.domain.auth.dto.res.EmailResponse;
-import com.kangaroo.sparring.domain.user.service.UserAccountService;
 import com.kangaroo.sparring.domain.auth.service.AuthTokenService;
-import com.kangaroo.sparring.domain.auth.service.UserRegistrationService;
 import com.kangaroo.sparring.domain.auth.service.EmailService;
 import com.kangaroo.sparring.domain.auth.service.EmailVerificationResult;
+import com.kangaroo.sparring.domain.auth.service.UserRegistrationService;
+import com.kangaroo.sparring.domain.user.service.UserAccountService;
 import com.kangaroo.sparring.global.exception.CustomException;
 import com.kangaroo.sparring.global.exception.ErrorCode;
 import com.kangaroo.sparring.global.response.MessageResponse;
-import com.kangaroo.sparring.global.security.principal.UserIdPrincipal;
 import com.kangaroo.sparring.global.security.oauth2.service.OAuth2CodeAuthService;
+import com.kangaroo.sparring.global.security.principal.UserIdPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.media.Content;
-import io.swagger.v3.oas.annotations.media.ExampleObject;
-import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.function.Supplier;
 
 @Tag(name = "인증", description = "회원가입 및 로그인 API")
 @RestController
@@ -39,82 +40,38 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 public class AuthController {
 
+    private static final String BEARER_PREFIX = "Bearer ";
+
     private final UserRegistrationService userRegistrationService;
     private final UserAccountService userAccountService;
     private final AuthTokenService authTokenService;
     private final EmailService emailService;
     private final OAuth2CodeAuthService oAuth2CodeAuthService;
 
-    /**
-     * 이메일 인증코드 발송
-     */
     @PostMapping("/send-verification")
-    @Operation(
-            summary = "이메일 인증코드 발송",
-            description = "회원가입/이메일 변경용 인증코드 발송. verificationId 발급."
-    )
+    @Operation(summary = "이메일 인증코드 발송", description = "회원가입/이메일 변경용 인증코드 발송")
     public ResponseEntity<EmailResponse> sendVerificationCode(
             @AuthenticationPrincipal UserIdPrincipal principal,
             @Valid @RequestBody EmailRequest request
     ) {
         Long userId = principal != null ? principal.getUserId() : null;
         EmailVerificationResult result = emailService.sendVerificationCode(request.getEmail(), userId);
-        return ResponseEntity.ok(EmailResponse.withVerification(
-                result.getEmail(),
-                "인증코드가 발송되었습니다.",
-                result.getVerificationId(),
-                result.getExpiresAt()
-        ));
+        return toVerificationResponse(result, "인증코드가 발송되었습니다.");
     }
 
-    /**
-     * 이메일 인증코드 재발송
-     */
     @PostMapping("/resend-verification")
-    @Operation(
-            summary = "이메일 인증코드 재발송",
-            description = "인증코드 재발송 (1분 쿨다운). 새 verificationId 발급."
-    )
+    @Operation(summary = "이메일 인증코드 재발송", description = "인증코드 재발송 (1분 쿨다운)")
     public ResponseEntity<EmailResponse> resendVerificationCode(
             @AuthenticationPrincipal UserIdPrincipal principal,
             @Valid @RequestBody EmailRequest request
     ) {
         Long userId = principal != null ? principal.getUserId() : null;
         EmailVerificationResult result = emailService.resendVerificationCode(request.getEmail(), userId);
-        return ResponseEntity.ok(EmailResponse.withVerification(
-                result.getEmail(),
-                "인증코드가 재발송되었습니다.",
-                result.getVerificationId(),
-                result.getExpiresAt()
-        ));
+        return toVerificationResponse(result, "인증코드가 재발송되었습니다.");
     }
 
-    /**
-     * 인증코드 검증
-     */
     @PostMapping("/verify-code")
-    @Operation(
-            summary = "인증코드 검증",
-            description = "verificationId + code로 인증코드 검증. 회원가입/이메일 변경 공용."
-    )
-    @ApiResponses({
-            @ApiResponse(
-                    responseCode = "200",
-                    description = "OK",
-                    content = @Content(
-                            mediaType = "application/json",
-                            examples = @ExampleObject(
-                                    name = "Success",
-                                    value = """
-                                            {
-                                              "email": "test@example.com",
-                                              "message": "이메일 인증이 완료되었습니다."
-                                            }
-                                            """
-                            )
-                    )
-            )
-    })
+    @Operation(summary = "인증코드 검증", description = "verificationId + code 검증")
     public ResponseEntity<EmailResponse> verifyCode(
             @AuthenticationPrincipal UserIdPrincipal principal,
             @Valid @RequestBody VerifyCodeRequest request
@@ -132,188 +89,70 @@ public class AuthController {
         return ResponseEntity.ok(EmailResponse.of(result.getEmail(), "이메일 인증이 완료되었습니다."));
     }
 
-    /**
-     * 회원가입
-     */
-    @Operation(summary = "회원가입", description = "이메일/비밀번호 회원가입 (이메일 인증 필요)")
-    @ApiResponses({
-            @ApiResponse(
-                    responseCode = "201",
-                    description = "Created",
-                    content = @Content(
-                            mediaType = "application/json",
-                            examples = @ExampleObject(
-                                    name = "Success",
-                                    value = """
-                                            {
-                                              "message": "회원가입이 완료되었습니다."
-                                            }
-                                            """
-                            )
-                    )
-            )
-    })
-    @io.swagger.v3.oas.annotations.parameters.RequestBody(
-            required = true,
-            content = @Content(
-                    mediaType = "application/json",
-                    examples = @ExampleObject(
-                            name = "Signup",
-                            value = """
-                                    {
-                                      "email": "test@example.com",
-                                      "password": "password123!",
-                                      "username": "홍길동",
-                                      "birthDate": "1995-03-10",
-                                      "gender": "MALE"
-                                    }
-                                    """
-                    )
-            )
-    )
     @PostMapping("/signup")
+    @Operation(summary = "회원가입", description = "이메일/비밀번호 회원가입")
     public ResponseEntity<MessageResponse> signup(@Valid @RequestBody SignupRequest request) {
         userRegistrationService.signup(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(MessageResponse.of("회원가입이 완료되었습니다."));
     }
 
-    @Operation(summary = "로그인", description = "이메일/비밀번호 로그인")
     @PostMapping("/login")
+    @Operation(summary = "로그인", description = "이메일/비밀번호 로그인")
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
-        AuthResponse response = authTokenService.login(request);
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(authTokenService.login(request));
     }
 
-    /**
-     * 소셜 로그인 (Google/Kakao, SDK/PKCE 분리 엔드포인트)
-     */
-    @Operation(summary = "Google PKCE 로그인", description = "브라우저 기반 Google OAuth authorization code + PKCE로 JWT 발급")
     @PostMapping("/oauth2/google/pkce")
-    @io.swagger.v3.oas.annotations.parameters.RequestBody(
-            required = true,
-            content = @Content(
-                    mediaType = "application/json",
-                    examples = @ExampleObject(
-                            name = "Google PKCE",
-                            value = """
-                                    {
-                                      "authorizationCode": "4/0AfJohXk...",
-                                      "redirectUri": "https://api.example.com/oauth/google/callback",
-                                      "codeVerifier": "hJtX...sK9"
-                                    }
-                                    """
-                    )
-            )
-    )
+    @Operation(summary = "Google PKCE 로그인")
     public ResponseEntity<AuthResponse> googlePkceLogin(@Valid @RequestBody OAuth2PkceLoginRequest request) {
-        return ResponseEntity.ok(oAuth2CodeAuthService.loginWithGooglePkce(request));
+        return oauthLogin(() -> oAuth2CodeAuthService.loginWithGooglePkce(request));
     }
 
-    @Operation(summary = "Google SDK 로그인", description = "모바일 Google SDK가 발급한 server auth code로 JWT 발급")
     @PostMapping("/oauth2/google/sdk")
-    @io.swagger.v3.oas.annotations.parameters.RequestBody(
-            required = true,
-            content = @Content(
-                    mediaType = "application/json",
-                    examples = @ExampleObject(
-                            name = "Google SDK",
-                            value = """
-                                    {
-                                      "serverAuthCode": "4/0AfJohXk..."
-                                    }
-                                    """
-                    )
-            )
-    )
+    @Operation(summary = "Google SDK 로그인")
     public ResponseEntity<AuthResponse> googleSdkLogin(@Valid @RequestBody GoogleSdkLoginRequest request) {
-        return ResponseEntity.ok(oAuth2CodeAuthService.loginWithGoogleSdkCode(request));
+        return oauthLogin(() -> oAuth2CodeAuthService.loginWithGoogleSdkCode(request));
     }
 
-    @Operation(summary = "Kakao PKCE 로그인", description = "브라우저 기반 Kakao OAuth authorization code + PKCE로 JWT 발급 (redirectUri는 카카오 콘솔에 등록 가능한 URI 사용)")
     @PostMapping("/oauth2/kakao/pkce")
-    @io.swagger.v3.oas.annotations.parameters.RequestBody(
-            required = true,
-            content = @Content(
-                    mediaType = "application/json",
-                    examples = @ExampleObject(
-                            name = "Kakao PKCE",
-                            value = """
-                                    {
-                                      "authorizationCode": "abc123...",
-                                      "redirectUri": "https://api.example.com/oauth/kakao/callback",
-                                      "codeVerifier": "hJtX...sK9"
-                                    }
-                                    """
-                    )
-            )
-    )
+    @Operation(summary = "Kakao PKCE 로그인")
     public ResponseEntity<AuthResponse> kakaoPkceLogin(@Valid @RequestBody OAuth2PkceLoginRequest request) {
-        return ResponseEntity.ok(oAuth2CodeAuthService.loginWithKakaoPkce(request));
+        return oauthLogin(() -> oAuth2CodeAuthService.loginWithKakaoPkce(request));
     }
 
-    @Operation(summary = "Kakao SDK 로그인", description = "모바일 Kakao SDK가 발급한 access token으로 JWT 발급")
     @PostMapping("/oauth2/kakao/sdk")
-    @io.swagger.v3.oas.annotations.parameters.RequestBody(
-            required = true,
-            content = @Content(
-                    mediaType = "application/json",
-                    examples = @ExampleObject(
-                            name = "Kakao SDK",
-                            value = """
-                                    {
-                                      "accessToken": "eyJhbGciOi..."
-                                    }
-                                    """
-                    )
-            )
-    )
+    @Operation(summary = "Kakao SDK 로그인")
     public ResponseEntity<AuthResponse> kakaoSdkLogin(@Valid @RequestBody KakaoSdkLoginRequest request) {
-        return ResponseEntity.ok(oAuth2CodeAuthService.loginWithKakaoSdkAccessToken(request));
+        return oauthLogin(() -> oAuth2CodeAuthService.loginWithKakaoSdkAccessToken(request));
     }
 
-    /**
-     * 액세스 토큰 갱신
-     */
     @PostMapping("/refresh")
     @Operation(summary = "토큰 갱신", description = "리프레시 토큰으로 액세스 토큰 재발급")
-    public ResponseEntity<AuthResponse> refreshToken(
-            @Parameter(description = "리프레시 토큰", required = true)
-            @RequestHeader("X-Refresh-Token") String refreshToken) {
-
-        AuthResponse response = authTokenService.refreshAccessToken(refreshToken);
-        return ResponseEntity.ok(response);
+    public ResponseEntity<AuthResponse> refreshToken(@RequestHeader("X-Refresh-Token") String refreshToken) {
+        return ResponseEntity.ok(authTokenService.refreshAccessToken(refreshToken));
     }
 
-    /**
-     * 로그아웃
-     */
     @PostMapping("/logout")
     @Operation(summary = "로그아웃", description = "리프레시 토큰 무효화")
-    @ApiResponses({
-            @ApiResponse(
-                    responseCode = "200",
-                    description = "OK",
-                    content = @Content(
-                            mediaType = "application/json",
-                            examples = @ExampleObject(
-                                    name = "Success",
-                                    value = """
-                                            {
-                                              "message": "로그아웃이 완료되었습니다."
-                                            }
-                                            """
-                            )
-                    )
-            )
-    })
     public ResponseEntity<MessageResponse> logout(@RequestHeader("Authorization") String accessToken) {
-        if (accessToken.startsWith("Bearer ")) {
-            accessToken = accessToken.substring(7);
-        }
-
-        authTokenService.logout(accessToken);
+        authTokenService.logout(stripBearerPrefix(accessToken));
         return ResponseEntity.ok(MessageResponse.of("로그아웃이 완료되었습니다."));
     }
 
+    private ResponseEntity<EmailResponse> toVerificationResponse(EmailVerificationResult result, String message) {
+        return ResponseEntity.ok(EmailResponse.withVerification(
+                result.getEmail(),
+                message,
+                result.getVerificationId(),
+                result.getExpiresAt()
+        ));
+    }
 
+    private ResponseEntity<AuthResponse> oauthLogin(Supplier<AuthResponse> loginSupplier) {
+        return ResponseEntity.ok(loginSupplier.get());
+    }
+
+    private String stripBearerPrefix(String token) {
+        return token.startsWith(BEARER_PREFIX) ? token.substring(BEARER_PREFIX.length()) : token;
+    }
 }

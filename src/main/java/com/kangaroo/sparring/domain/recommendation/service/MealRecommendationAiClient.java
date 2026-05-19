@@ -1,7 +1,8 @@
 package com.kangaroo.sparring.domain.recommendation.service;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.kangaroo.sparring.domain.recommendation.dto.ml.MealRecommendationMlRequest;
+import com.kangaroo.sparring.domain.recommendation.dto.ml.MealRecommendationMlResponse;
 import com.kangaroo.sparring.domain.recommendation.dto.res.MealRecommendationResponse;
 import com.kangaroo.sparring.global.exception.CustomException;
 import com.kangaroo.sparring.global.exception.ErrorCode;
@@ -11,10 +12,10 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 @Slf4j
 @Component
@@ -24,109 +25,87 @@ public class MealRecommendationAiClient {
     private final WebClient.Builder webClientBuilder;
     private final ObjectMapper objectMapper;
 
-    @Value("${ml.server.url}")
+    @Value("${ml.recommendation.url}")
     private String serverUrl;
 
-    @Value("${ml.server.recommend-path:/recommend}")
+    @Value("${ml.recommendation.path:/api/v1/recommendations}")
     private String recommendPath;
 
-    /**
-     * AI 서버에 식단 추천 요청
-     */
-    public AiRecommendResult recommend(Map<String, Object> requestBody) {
+    public AiRecommendResult recommend(MealRecommendationMlRequest requestBody) {
+        long startedAt = System.currentTimeMillis();
+        String endpoint = serverUrl + recommendPath;
+        log.info("FastAPI 식단 추천 호출 시작: endpoint={}", endpoint);
+
         try {
             String responseBody = webClientBuilder.build()
                     .post()
-                    .uri(serverUrl + recommendPath)
+                    .uri(endpoint)
                     .contentType(MediaType.APPLICATION_JSON)
-                    .bodyValue(objectMapper.writeValueAsString(requestBody))
+                    .bodyValue(requestBody)
                     .retrieve()
                     .bodyToMono(String.class)
                     .block();
 
-            return parseResponse(responseBody);
-
+            AiRecommendResult result = parseResponse(responseBody);
+            log.info("FastAPI 식단 추천 호출 성공: endpoint={}, elapsedMs={}, cards={}",
+                    endpoint, System.currentTimeMillis() - startedAt, result.cards().size());
+            return result;
+        } catch (WebClientResponseException e) {
+            log.error("FastAPI 식단 추천 HTTP 오류: endpoint={}, status={}, elapsedMs={}, body={}",
+                    endpoint, e.getStatusCode(), System.currentTimeMillis() - startedAt, e.getResponseBodyAsString(), e);
+            throw new CustomException(ErrorCode.AI_RECOMMENDATION_FAILED);
         } catch (Exception e) {
-            log.error("AI 서버 식단 추천 호출 실패", e);
+            log.error("FastAPI 식단 추천 호출 실패: endpoint={}, elapsedMs={}",
+                    endpoint, System.currentTimeMillis() - startedAt, e);
             throw new CustomException(ErrorCode.AI_RECOMMENDATION_FAILED);
         }
     }
 
     private AiRecommendResult parseResponse(String responseBody) {
         try {
-            JsonNode root = objectMapper.readTree(responseBody);
+            MealRecommendationMlResponse response = objectMapper.readValue(responseBody, MealRecommendationMlResponse.class);
 
-            // goals
-            List<String> goals = new ArrayList<>();
-            root.path("goals").forEach(g -> goals.add(g.asText()));
+            List<MealRecommendationResponse.RecommendationCardDto> cards = new ArrayList<>();
+            response.recommendationsOrEmpty().forEach(item -> {
+                List<MealRecommendationResponse.MenuItemDto> menus = new ArrayList<>();
+                item.recipesOrEmpty().forEach(r -> {
+                    menus.add(MealRecommendationResponse.MenuItemDto.builder()
+                            .id(r.recipeIdOrZero())
+                            .name(r.recipeNameOrEmpty())
+                            .kcal(r.kcalOrZero())
+                            .carbs(r.carbsOrZero())
+                            .protein(r.proteinOrZero())
+                            .fat(r.fatOrZero())
+                            .sodium(r.sodium())
+                            .build());
+                });
 
-            // meal_recommendations
-            String mealTime = root.path("meal_time").asText();
-            List<MealRecommendationResponse.RecommendedFoodDto> recommendations = new ArrayList<>();
-            JsonNode recsNode = root.path("meal_recommendations");
-
-            recsNode.forEach(item -> {
-                List<String> reasons = new ArrayList<>();
-                item.path("reasons").forEach(r -> reasons.add(r.asText()));
-
-                recommendations.add(MealRecommendationResponse.RecommendedFoodDto.builder()
-                        .foodName(item.path("food_name").asText())
-                        .calories(nullableDouble(item, "calories"))
-                        .carbs(nullableDouble(item, "carbs"))
-                        .protein(nullableDouble(item, "protein"))
-                        .fat(nullableDouble(item, "fat"))
-                        .fiber(nullableDouble(item, "fiber"))
-                        .sodium(nullableDouble(item, "sodium"))
-                        .reasons(reasons)
+                cards.add(MealRecommendationResponse.RecommendationCardDto.builder()
+                        .rank(item.rankOrZero())
+                        .title(item.titleOrEmpty())
+                        .nutrients(MealRecommendationResponse.NutrientsDto.builder()
+                                .kcal(item.totalKcalOrZero())
+                                .carbs(item.totalCarbsOrZero())
+                                .protein(item.totalProteinOrZero())
+                                .fat(item.totalFatOrZero())
+                                .sodium(item.totalSodium())
+                                .build())
+                        .reasons(item.reasonsOrEmpty())
+                        .menus(menus)
                         .build());
             });
 
-            // food_code 목록 추출 (내부 로그용)
-            List<String> foodCodes = new ArrayList<>();
-            recsNode.forEach(item -> {
-                String fc = item.path("food_code").asText(null);
-                foodCodes.add((fc == null || fc.isBlank()) ? null : fc);
-            });
-
-            // fallback_level
-            int fallbackLevel = root.path("fallback_level").asInt(0);
-
-            // applied_constraints, feature_contrib, reason_codes (로그용)
-            String appliedConstraints = root.path("applied_constraints").toString();
-            String featureContrib = root.path("feature_contrib").toString();
-            String reasonCodes = root.path("reason_codes").toString();
-
-            return new AiRecommendResult(
-                    mealTime, goals,
-                    foodCodes,
-                    recommendations,
-                    fallbackLevel, appliedConstraints, featureContrib,
-                    reasonCodes, objectMapper.writeValueAsString(foodCodes)
-            );
+            return new AiRecommendResult(response.mealType(), response.mealTargetKcalOrZero(), cards);
 
         } catch (Exception e) {
-            log.error("AI 서버 응답 파싱 실패: {}", responseBody, e);
+            log.error("FastAPI 응답 파싱 실패: {}", responseBody, e);
             throw new CustomException(ErrorCode.AI_RECOMMENDATION_FAILED);
         }
     }
 
-    private Double nullableDouble(JsonNode node, String field) {
-        JsonNode val = node.path(field);
-        return val.isNull() || val.isMissingNode() ? null : val.asDouble();
-    }
-
-    /**
-     * AI 서버 응답 파싱 결과
-     */
     public record AiRecommendResult(
-            String mealTime,
-            List<String> goals,
-            List<String> foodCodes,
-            List<MealRecommendationResponse.RecommendedFoodDto> recommendations,
-            int fallbackLevel,
-            String appliedConstraints,
-            String featureContrib,
-            String reasonCodes,
-            String foodCodesJson
+            String mealType,
+            double mealTargetKcal,
+            List<MealRecommendationResponse.RecommendationCardDto> cards
     ) {}
 }

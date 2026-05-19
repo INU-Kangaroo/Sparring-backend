@@ -1,14 +1,16 @@
 package com.kangaroo.sparring.domain.insight.today.service;
 
 import com.kangaroo.sparring.domain.insight.today.type.InsightType;
-import com.kangaroo.sparring.domain.record.common.read.BloodPressureRecord;
-import com.kangaroo.sparring.domain.record.common.read.BloodSugarRecord;
-import com.kangaroo.sparring.domain.record.common.read.RecordReadService;
+import com.kangaroo.sparring.domain.record.common.BloodPressureRecord;
+import com.kangaroo.sparring.domain.record.common.BloodSugarRecord;
+import com.kangaroo.sparring.domain.record.common.FoodRecord;
+import com.kangaroo.sparring.domain.record.common.RecordReadService;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Comparator;
@@ -19,6 +21,7 @@ import java.util.List;
 public class InsightContextBuilder {
 
     private final RecordReadService recordReadService;
+    private final Clock kstClock;
 
     // 정상 범위 상수
     private static final int FASTING_SUGAR_NORMAL_MAX = 100;
@@ -28,18 +31,23 @@ public class InsightContextBuilder {
     private static final int STABLE_CONSECUTIVE_DAYS = 3;
 
     public InsightContext build(Long userId) {
-        LocalDateTime start = LocalDate.now().minusDays(DAYS_LOOKBACK).atStartOfDay();
-        LocalDateTime end = LocalDateTime.now();
+        LocalDate today = LocalDate.now(kstClock);
+        LocalDate lookbackStartDate = today.minusDays(DAYS_LOOKBACK);
+        LocalDateTime start = lookbackStartDate.atStartOfDay();
+        LocalDateTime end = LocalDateTime.now(kstClock);
 
         List<BloodSugarRecord> sugarLogs = recordReadService.getBloodSugarRecords(userId, start, end);
         List<BloodPressureRecord> pressureLogs = recordReadService.getBloodPressureRecords(userId, start, end);
+        List<FoodRecord> foodLogs = recordReadService.getFoodRecords(userId, start, end);
+        int todaySteps = recordReadService.getStepsOnDate(userId, today);
+        int averageDailySteps = recordReadService.getAverageDailySteps(userId, lookbackStartDate, today);
 
-        if (sugarLogs.isEmpty() && pressureLogs.isEmpty()) {
-            return InsightContext.of(InsightType.NO_DATA, sugarLogs, pressureLogs);
+        if (sugarLogs.isEmpty() && pressureLogs.isEmpty() && foodLogs.isEmpty() && todaySteps == 0) {
+            return InsightContext.of(InsightType.NO_DATA, sugarLogs, pressureLogs, foodLogs, todaySteps, averageDailySteps);
         }
 
         InsightType type = classify(sugarLogs, pressureLogs);
-        return InsightContext.of(type, sugarLogs, pressureLogs);
+        return InsightContext.of(type, sugarLogs, pressureLogs, foodLogs, todaySteps, averageDailySteps);
     }
 
     private InsightType classify(List<BloodSugarRecord> sugarLogs,
@@ -131,26 +139,38 @@ public class InsightContextBuilder {
         private InsightType type;
         private List<BloodSugarRecord> sugarLogs;
         private List<BloodPressureRecord> pressureLogs;
+        private List<FoodRecord> foodLogs;
 
         // 프롬프트용 요약 데이터
         private Double avgGlucose;
         private Integer latestSystolic;
+        private Integer mealLogCount;
+        private Integer todaySteps;
+        private Integer averageDailySteps;
 
         public static InsightContext of(InsightType type,
                                         List<BloodSugarRecord> sugarLogs,
-                                        List<BloodPressureRecord> pressureLogs) {
+                                        List<BloodPressureRecord> pressureLogs,
+                                        List<FoodRecord> foodLogs,
+                                        int todaySteps,
+                                        int averageDailySteps) {
             Double avg = sugarLogs.isEmpty() ? null :
                     sugarLogs.stream().mapToInt(BloodSugarRecord::getGlucoseLevel)
                             .average().orElse(0);
             Integer systolic = pressureLogs.isEmpty() ? null :
                     pressureLogs.get(pressureLogs.size() - 1).getSystolic();
+            int mealLogCount = foodLogs != null ? foodLogs.size() : 0;
 
             return InsightContext.builder()
                     .type(type)
                     .sugarLogs(sugarLogs)
                     .pressureLogs(pressureLogs)
+                    .foodLogs(foodLogs)
                     .avgGlucose(avg)
                     .latestSystolic(systolic)
+                    .mealLogCount(mealLogCount)
+                    .todaySteps(todaySteps)
+                    .averageDailySteps(averageDailySteps)
                     .build();
         }
     }

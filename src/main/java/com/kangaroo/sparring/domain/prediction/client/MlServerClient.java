@@ -2,27 +2,22 @@ package com.kangaroo.sparring.domain.prediction.client;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.kangaroo.sparring.domain.record.common.read.BloodSugarRecord;
-import com.kangaroo.sparring.domain.record.common.read.InsulinRecord;
-import com.kangaroo.sparring.domain.prediction.dto.res.GlucosePredictionResponse;
 import com.kangaroo.sparring.global.exception.CustomException;
 import com.kangaroo.sparring.global.exception.ErrorCode;
+import lombok.Builder;
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 import org.springframework.web.reactive.function.client.WebClient;
 
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 
 @Slf4j
 @Component
@@ -32,129 +27,125 @@ public class MlServerClient {
     private final WebClient.Builder webClientBuilder;
     private final ObjectMapper objectMapper;
 
-    @Value("${ml.server.url}")
+    @Value("${ml.prediction.url}")
     private String mlServerUrl;
 
+    @Value("${ml.prediction.path:/predict-glucose}")
+    private String predictPath;
+
     public PredictionResult predictGlucose(
-            LocalDateTime timestamp,
-            List<BloodSugarRecord> glucoseHistory,
-            double carbIntake,
-            int mealType,
-            int steps,
-            double intensity,
-            List<InsulinRecord> insulinEvents,
-            boolean tempBasalActive,
-            double tempBasalValue
+            Double baselineGlucose,
+            String sex,
+            MealPayload meal
     ) {
+        long startedAt = System.currentTimeMillis();
+        String endpoint = mlServerUrl + predictPath;
+        log.info("ML 혈당 예측 호출 시작: endpoint={}, mealType={}", endpoint, meal.getMealType());
+
         try {
-            ObjectNode requestBody = objectMapper.createObjectNode();
-            requestBody.put("timestamp", timestamp.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
+            ObjectNode root = objectMapper.createObjectNode();
+            root.put("baselineGlucose", baselineGlucose);
+            root.put("sex", sex);
 
-            ArrayNode glucoseHistoryNode = requestBody.putArray("glucoseHistory");
-            for (BloodSugarRecord record : glucoseHistory) {
-                ObjectNode item = glucoseHistoryNode.addObject();
-                item.put("glucoseLevel", record.getGlucoseLevel());
-                item.put("measuredAt", record.getMeasurementTime().withNano(0).format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
-                item.put("measurementLabel", record.getMeasurementLabel());
-            }
-
-            requestBody.put("carbIntake", carbIntake);
-            requestBody.put("mealType", mealType);
-            requestBody.put("steps", steps);
-            requestBody.put("intensity", intensity);
-
-            ArrayNode insulinEventsNode = requestBody.putArray("insulinEvents");
-            for (InsulinRecord record : insulinEvents) {
-                ObjectNode item = insulinEventsNode.addObject();
-                item.put("eventType", record.getEventType().name().toLowerCase());
-                item.put("dose", record.getDose());
-                item.put("usedAt", record.getUsedAt().withNano(0).format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
-                item.put("insulinType", record.getInsulinType());
-            }
-
-            requestBody.put("tempBasalActive", tempBasalActive);
-            requestBody.put("tempBasalValue", tempBasalValue);
-            requestBody.put("debug", false);
+            ObjectNode mealNode = root.putObject("meal");
+            mealNode.put("carbs", meal.getCarbs());
+            mealNode.put("protein", meal.getProtein());
+            mealNode.put("fat", meal.getFat());
+            mealNode.put("fiber", meal.getFiber());
+            mealNode.put("kcal", meal.getKcal());
+            mealNode.put("mealType", meal.getMealType());
 
             String responseBody = webClientBuilder.build()
                     .post()
-                    .uri(mlServerUrl + "/predict-glucose")
+                    .uri(mlServerUrl + predictPath)
                     .contentType(MediaType.APPLICATION_JSON)
-                    .bodyValue(requestBody.toString())
+                    .bodyValue(root.toString())
                     .retrieve()
                     .bodyToMono(String.class)
                     .block();
 
-            JsonNode root = objectMapper.readTree(responseBody);
-            JsonNode forecastNode = root.get("forecast");
-            if (forecastNode == null || !forecastNode.isArray() || forecastNode.isEmpty()) {
-                throw new CustomException(ErrorCode.AI_PREDICTION_FAILED, "forecast 응답이 비어 있습니다.");
+            JsonNode response = objectMapper.readTree(responseBody);
+            List<CurveDeltaPoint> curve = parseCurve(response, baselineGlucose);
+            Double peakDelta = readOptionalDouble(response, "peakDelta", "peak_delta");
+            Integer peakMinute = readOptionalInt(response, "peakMinute", "peak_minute");
+
+            if (peakDelta == null) {
+                Double peakGlucose = readOptionalDouble(response, "peakGlucose", "peak_glucose");
+                if (peakGlucose != null) {
+                    peakDelta = peakGlucose - baselineGlucose;
+                }
+            }
+            if (peakMinute == null) {
+                peakMinute = readOptionalInt(response, "peakOffsetMinutes", "peak_offset_minutes");
+            }
+            if (peakDelta == null || peakMinute == null) {
+                throw new CustomException(ErrorCode.AI_PREDICTION_FAILED, "peak 응답 필드가 누락되었습니다.");
             }
 
-            List<GlucosePredictionResponse.ForecastPoint> points = new ArrayList<>();
-            for (JsonNode point : forecastNode) {
-                points.add(GlucosePredictionResponse.ForecastPoint.builder()
-                        .time(readOptionalText(point, "time", "time"))
-                        .offsetMinutes(readInt(point, "offsetMinutes", "offset_minutes"))
-                        .step(readOptionalInt(point, "step", "step"))
-                        .predictedGlucose(readDouble(point, "predictedGlucose", "predicted_glucose"))
-                        .build());
-            }
-
-            if (points.isEmpty()) {
-                throw new CustomException(ErrorCode.AI_PREDICTION_FAILED, "forecast 파싱 결과가 비어 있습니다.");
-            }
-
-            points.sort(Comparator.comparingInt(GlucosePredictionResponse.ForecastPoint::getOffsetMinutes));
-
-            Map<String, GlucosePredictionResponse.ForecastPoint> milestones = parseMilestones(root.get("milestones"));
-            GlucosePredictionResponse.Peak peak = parsePeak(root.get("peak"));
-
-            Double predictedGlucose = readOptionalDouble(root, "predictedGlucose", "predicted_glucose");
-            if (predictedGlucose == null) {
-                predictedGlucose = points.get(points.size() - 1).getPredictedGlucose();
-            }
-            Integer predictionOffsetMinutes = readOptionalInt(root, "predictionOffsetMinutes", "prediction_offset_minutes");
-            if (predictionOffsetMinutes == null) {
-                predictionOffsetMinutes = points.get(points.size() - 1).getOffsetMinutes();
-            }
-            String predictedTime = readOptionalText(root, "predictedTime", "predicted_time");
-            if (predictedTime == null) {
-                predictedTime = points.get(points.size() - 1).getTime();
-            }
-
-            if (peak == null) {
-                GlucosePredictionResponse.ForecastPoint peakPoint = points.stream()
-                        .max(Comparator.comparingDouble(GlucosePredictionResponse.ForecastPoint::getPredictedGlucose))
-                        .orElse(points.get(0));
-                peak = GlucosePredictionResponse.Peak.builder()
-                        .peakGlucose(peakPoint.getPredictedGlucose())
-                        .peakTime(peakPoint.getTime())
-                        .peakOffsetMinutes(peakPoint.getOffsetMinutes())
-                        .build();
-            }
-
-            if (milestones.isEmpty()) {
-                milestones = buildMilestonesFromForecast(points);
-            }
-
-            JsonNode debugNode = root.get("debug");
-            Object debug = (debugNode == null || debugNode.isNull()) ? null : objectMapper.treeToValue(debugNode, Object.class);
-
-            return PredictionResult.builder()
-                    .predictedGlucose(predictedGlucose)
-                    .predictionOffsetMinutes(predictionOffsetMinutes)
-                    .predictedTime(predictedTime)
-                    .forecast(points)
-                    .milestones(milestones)
-                    .peak(peak)
-                    .debug(debug)
+            PredictionResult result = PredictionResult.builder()
+                    .peakDelta(peakDelta)
+                    .peakMinute(peakMinute)
+                    .curve(curve)
                     .build();
-
+            log.info("ML 혈당 예측 호출 성공: endpoint={}, elapsedMs={}, curveSize={}, peakMinute={}",
+                    endpoint, System.currentTimeMillis() - startedAt, curve.size(), peakMinute);
+            return result;
+        } catch (WebClientResponseException e) {
+            log.error("ML 서버 혈당 예측 HTTP 오류 endpoint={}, status={}, elapsedMs={}, body={}",
+                    endpoint, e.getStatusCode(), System.currentTimeMillis() - startedAt, e.getResponseBodyAsString(), e);
+            throw new CustomException(
+                    ErrorCode.AI_PREDICTION_FAILED,
+                    "ML 서버 응답 오류(" + e.getStatusCode().value() + "): " + e.getResponseBodyAsString()
+            );
         } catch (Exception e) {
-            log.error("ML 서버 혈당 예측 호출 실패", e);
-            throw new CustomException(ErrorCode.AI_PREDICTION_FAILED);
+            log.error("ML 서버 혈당 예측 호출 실패 endpoint={}, elapsedMs={}",
+                    endpoint, System.currentTimeMillis() - startedAt, e);
+            throw new CustomException(ErrorCode.AI_PREDICTION_FAILED, e.getMessage());
         }
+    }
+
+    private List<CurveDeltaPoint> parseCurve(JsonNode response, Double baselineGlucose) {
+        JsonNode curveNode = response.get("curve");
+        if (curveNode == null || !curveNode.isArray() || curveNode.isEmpty()) {
+            return parseForecastFallback(response, baselineGlucose);
+        }
+
+        List<CurveDeltaPoint> points = new ArrayList<>();
+        for (JsonNode point : curveNode) {
+            points.add(CurveDeltaPoint.builder()
+                    .minute(readInt(point, "minute", "minute"))
+                    .delta(readDouble(point, "delta", "delta"))
+                    .build());
+        }
+
+        points.sort(Comparator.comparingInt(CurveDeltaPoint::getMinute));
+        return points;
+    }
+
+    private List<CurveDeltaPoint> parseForecastFallback(JsonNode response, Double baselineGlucose) {
+        JsonNode forecastNode = response.get("forecast");
+        if (forecastNode == null || !forecastNode.isArray() || forecastNode.isEmpty()) {
+            throw new CustomException(ErrorCode.AI_PREDICTION_FAILED, "curve/forecast 응답이 비어 있습니다.");
+        }
+
+        List<CurveDeltaPoint> points = new ArrayList<>();
+        for (JsonNode point : forecastNode) {
+            Integer minute = readOptionalInt(point, "offsetMinutes", "offset_minutes");
+            Double predictedGlucose = readOptionalDouble(point, "predictedGlucose", "predicted_glucose");
+            if (minute == null || predictedGlucose == null) {
+                continue;
+            }
+            points.add(CurveDeltaPoint.builder()
+                    .minute(minute)
+                    .delta(predictedGlucose - baselineGlucose)
+                    .build());
+        }
+
+        if (points.isEmpty()) {
+            throw new CustomException(ErrorCode.AI_PREDICTION_FAILED, "forecast 포맷에서 유효한 포인트를 찾지 못했습니다.");
+        }
+        points.sort(Comparator.comparingInt(CurveDeltaPoint::getMinute));
+        return points;
     }
 
     private int readInt(JsonNode node, String camelCaseField, String snakeCaseField) {
@@ -201,78 +192,29 @@ public class MlServerClient {
         return target.asDouble();
     }
 
-    private String readOptionalText(JsonNode node, String camelCaseField, String snakeCaseField) {
-        JsonNode target = node.get(camelCaseField);
-        if (target == null) {
-            target = node.get(snakeCaseField);
-        }
-        if (target == null || target.isNull()) {
-            return null;
-        }
-        return target.asText();
+    @Getter
+    @Builder
+    public static class MealPayload {
+        private Double carbs;
+        private Double protein;
+        private Double fat;
+        private Double fiber;
+        private Double kcal;
+        private String mealType;
     }
 
-    private Map<String, GlucosePredictionResponse.ForecastPoint> parseMilestones(JsonNode milestonesNode) {
-        Map<String, GlucosePredictionResponse.ForecastPoint> milestones = new LinkedHashMap<>();
-        if (milestonesNode == null || !milestonesNode.isObject()) {
-            return milestones;
-        }
-
-        String[] keys = {"10", "30", "60", "90", "120"};
-        for (String key : keys) {
-            JsonNode point = milestonesNode.get(key);
-            if (point == null || point.isNull()) {
-                continue;
-            }
-            milestones.put(key, GlucosePredictionResponse.ForecastPoint.builder()
-                    .time(readOptionalText(point, "time", "time"))
-                    .offsetMinutes(readInt(point, "offsetMinutes", "offset_minutes"))
-                    .step(readOptionalInt(point, "step", "step"))
-                    .predictedGlucose(readDouble(point, "predictedGlucose", "predicted_glucose"))
-                    .build());
-        }
-        return milestones;
+    @Getter
+    @Builder
+    public static class CurveDeltaPoint {
+        private Integer minute;
+        private Double delta;
     }
 
-    private Map<String, GlucosePredictionResponse.ForecastPoint> buildMilestonesFromForecast(
-            List<GlucosePredictionResponse.ForecastPoint> forecast
-    ) {
-        Map<String, GlucosePredictionResponse.ForecastPoint> milestones = new LinkedHashMap<>();
-        int[] offsets = {10, 30, 60, 90, 120};
-        for (int offset : offsets) {
-            forecast.stream()
-                    .filter(point -> point.getOffsetMinutes() == offset)
-                    .findFirst()
-                    .ifPresent(point -> milestones.put(String.valueOf(offset), point));
-        }
-        return milestones;
-    }
-
-    private GlucosePredictionResponse.Peak parsePeak(JsonNode peakNode) {
-        if (peakNode == null || peakNode.isNull() || !peakNode.isObject()) {
-            return null;
-        }
-        Double peakGlucose = readOptionalDouble(peakNode, "peakGlucose", "peak_glucose");
-        Integer peakOffset = readOptionalInt(peakNode, "peakOffsetMinutes", "peak_offset_minutes");
-        if (peakGlucose == null || peakOffset == null) {
-            return null;
-        }
-        return GlucosePredictionResponse.Peak.builder()
-                .peakGlucose(peakGlucose)
-                .peakTime(readOptionalText(peakNode, "peakTime", "peak_time"))
-                .peakOffsetMinutes(peakOffset)
-                .build();
-    }
-
-    @lombok.Getter
-    @lombok.Builder
+    @Getter
+    @Builder
     public static class PredictionResult {
-        private Double predictedGlucose;
-        private Integer predictionOffsetMinutes;
-        private String predictedTime;
-        private List<GlucosePredictionResponse.ForecastPoint> forecast;
-        private Map<String, GlucosePredictionResponse.ForecastPoint> milestones;
-        private GlucosePredictionResponse.Peak peak;
-        private Object debug;
+        private Double peakDelta;
+        private Integer peakMinute;
+        private List<CurveDeltaPoint> curve;
     }
 }

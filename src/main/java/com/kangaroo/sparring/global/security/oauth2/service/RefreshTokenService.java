@@ -29,7 +29,7 @@ public class RefreshTokenService {
         String key = REFRESH_TOKEN_PREFIX + userId;
         Duration expiration = Duration.ofMillis(refreshTokenValidityMs);
         redisTemplate.opsForValue().set(key, refreshToken, expiration);
-        log.info("Refresh token saved for user: {} with TTL: {} days", userId, expiration.toDays());
+        log.debug("Refresh token saved for user: {} with TTL: {} days", userId, expiration.toDays());
     }
 
     /**
@@ -46,7 +46,7 @@ public class RefreshTokenService {
     public void deleteRefreshToken(Long userId) {
         String key = REFRESH_TOKEN_PREFIX + userId;
         redisTemplate.delete(key);
-        log.info("Refresh token deleted for user: {}", userId);
+        log.debug("Refresh token deleted for user: {}", userId);
     }
 
     /**
@@ -62,7 +62,7 @@ public class RefreshTokenService {
         Duration expiration = Duration.ofMillis(refreshTokenValidityMs);
         String revokedAfterEpochMilli = String.valueOf(Instant.now().toEpochMilli());
         redisTemplate.opsForValue().set(key, revokedAfterEpochMilli, expiration);
-        log.info("Access tokens revoked for user: {}", userId);
+        log.debug("Access tokens revoked for user: {}", userId);
     }
 
     public boolean isAccessTokenRevoked(Long userId, long tokenIssuedAtEpochMilli) {

@@ -1,6 +1,6 @@
 package com.kangaroo.sparring.domain.record.api.dto.req;
 
-import com.kangaroo.sparring.domain.record.common.support.RecordPeriodSupport;
+import com.kangaroo.sparring.domain.record.common.RecordPeriodSupport;
 import com.kangaroo.sparring.domain.record.common.type.RecordPeriod;
 import io.swagger.v3.oas.annotations.Parameter;
 import lombok.Getter;

@@ -7,6 +7,7 @@ import com.kangaroo.sparring.domain.record.insulin.entity.InsulinLog;
 import com.kangaroo.sparring.domain.record.insulin.repository.InsulinLogRepository;
 import com.kangaroo.sparring.domain.user.entity.User;
 import com.kangaroo.sparring.domain.user.repository.UserRepository;
+import com.kangaroo.sparring.domain.user.service.UserLookupService;
 import com.kangaroo.sparring.global.exception.CustomException;
 import com.kangaroo.sparring.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -27,13 +28,14 @@ public class InsulinLogService {
 
     private final InsulinLogRepository insulinLogRepository;
     private final UserRepository userRepository;
+    private final UserLookupService userLookupService;
     private final Clock kstClock;
 
     @Transactional
     public InsulinLogResponse createInsulinLog(Long userId, InsulinLogCreateRequest request) {
         log.info("인슐린 기록 등록 시작: userId={}, eventType={}", userId, request.getEventType());
 
-        User user = findUserById(userId);
+        User user = userLookupService.getUserOrThrow(userId);
         LocalDateTime usedAt = LocalDateTime.of(request.getUsedDate(), request.getUsedTime());
         MeasurementValidationSupport.validateMeasurementTime(usedAt, kstClock);
 
@@ -56,15 +58,10 @@ public class InsulinLogService {
     }
 
     public List<InsulinLogResponse> getInsulinLogs(Long userId, LocalDateTime startDate, LocalDateTime endDate) {
-        log.info("인슐린 기록 조회: userId={}, startDate={}, endDate={}", userId, startDate, endDate);
+        log.debug("인슐린 기록 조회: userId={}, startDate={}, endDate={}", userId, startDate, endDate);
         MeasurementValidationSupport.validateDateRange(startDate, endDate);
         return insulinLogRepository.findByUserIdAndDateRange(userId, startDate, endDate).stream()
                 .map(InsulinLogResponse::from)
                 .toList();
-    }
-
-    private User findUserById(Long userId) {
-        return userRepository.findById(userId)
-                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
     }
 }

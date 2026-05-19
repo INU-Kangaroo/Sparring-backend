@@ -1,30 +1,36 @@
 package com.kangaroo.sparring.domain.record.api.controller;
 
-import com.kangaroo.sparring.domain.record.exercise.dto.req.ExerciseLogRequest;
-import com.kangaroo.sparring.domain.record.exercise.dto.res.ExerciseLogCreateResponse;
-import com.kangaroo.sparring.domain.record.exercise.dto.res.ExerciseLogListItemResponse;
-import com.kangaroo.sparring.domain.record.food.dto.req.FoodLogCreateRequest;
-import com.kangaroo.sparring.domain.record.food.dto.res.FoodLogCreateResponse;
-import com.kangaroo.sparring.domain.record.food.dto.res.FoodLogListItemResponse;
+import com.kangaroo.sparring.domain.record.api.dto.req.RecordQueryRequest;
 import com.kangaroo.sparring.domain.record.blood.dto.req.BloodPressureLogCreateRequest;
 import com.kangaroo.sparring.domain.record.blood.dto.req.BloodSugarLogCreateRequest;
 import com.kangaroo.sparring.domain.record.blood.dto.res.BloodPressureLogResponse;
 import com.kangaroo.sparring.domain.record.blood.dto.res.BloodSugarLogResponse;
-import com.kangaroo.sparring.domain.record.api.dto.req.RecordQueryRequest;
-import com.kangaroo.sparring.domain.record.insulin.dto.req.InsulinLogCreateRequest;
-import com.kangaroo.sparring.domain.record.insulin.dto.res.InsulinLogResponse;
-import com.kangaroo.sparring.domain.record.exercise.service.ExerciseLogService;
-import com.kangaroo.sparring.domain.record.food.service.FoodLogService;
 import com.kangaroo.sparring.domain.record.blood.service.BloodPressureService;
 import com.kangaroo.sparring.domain.record.blood.service.BloodSugarService;
+import com.kangaroo.sparring.domain.record.common.RecordPeriodSupport;
+import com.kangaroo.sparring.domain.record.exercise.dto.req.ExerciseLogRequest;
+import com.kangaroo.sparring.domain.record.exercise.dto.res.ExerciseLogCreateResponse;
+import com.kangaroo.sparring.domain.record.exercise.dto.res.ExerciseLogListItemResponse;
+import com.kangaroo.sparring.domain.record.exercise.service.ExerciseLogService;
+import com.kangaroo.sparring.domain.record.food.dto.req.FoodLogCreateRequest;
+import com.kangaroo.sparring.domain.record.food.dto.res.FoodLogCreateResponse;
+import com.kangaroo.sparring.domain.record.food.dto.res.FoodLogListItemResponse;
+import com.kangaroo.sparring.domain.record.food.service.FoodLogService;
+import com.kangaroo.sparring.domain.record.insulin.dto.req.InsulinLogCreateRequest;
+import com.kangaroo.sparring.domain.record.insulin.dto.res.InsulinLogResponse;
 import com.kangaroo.sparring.domain.record.insulin.service.InsulinLogService;
+import com.kangaroo.sparring.domain.record.steps.dto.req.StepSyncRequest;
+import com.kangaroo.sparring.domain.record.steps.dto.res.StepDailyResponse;
+import com.kangaroo.sparring.domain.record.steps.dto.res.StepSyncResponse;
+import com.kangaroo.sparring.domain.record.steps.dto.res.StepTodayResponse;
+import com.kangaroo.sparring.domain.record.steps.service.StepLogService;
 import com.kangaroo.sparring.global.security.principal.PrincipalResolver;
 import com.kangaroo.sparring.global.security.principal.UserIdPrincipal;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import org.springdoc.core.annotations.ParameterObject;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -37,6 +43,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.Clock;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Tag(name = "기록", description = "기록 생성/조회 API")
@@ -50,60 +57,43 @@ public class RecordController {
     private final InsulinLogService insulinLogService;
     private final FoodLogService foodLogService;
     private final ExerciseLogService exerciseLogService;
+    private final StepLogService stepLogService;
     private final Clock kstClock;
 
-    @Operation(
-            summary = "혈당 기록 등록",
-            description = "신규 경로: /api/records/blood-sugar. 기존 /api/measurements/blood-sugar/logs 경로는 삭제 예정입니다."
-    )
+    @Operation(summary = "혈당 기록 등록", description = "혈당 기록 등록")
     @PostMapping("/blood-sugar")
     public ResponseEntity<BloodSugarLogResponse> createBloodSugarRecord(
             @AuthenticationPrincipal UserIdPrincipal principal,
             @Valid @RequestBody BloodSugarLogCreateRequest request
     ) {
-        Long userId = PrincipalResolver.resolveUserId(principal);
-        return ResponseEntity.status(HttpStatus.CREATED).body(bloodSugarService.createBloodSugarLog(userId, request));
+        return created(bloodSugarService.createBloodSugarLog(resolveUserId(principal), request));
     }
 
-    @Operation(
-            summary = "혈당 기록 조회",
-            description = "period(daily/weekly/monthly/range) 기준으로 혈당 기록 조회. 기존 /api/measurements/blood-sugar/logs 조회 경로는 삭제 예정입니다."
-    )
+    @Operation(summary = "혈당 기록 조회", description = "period(daily/weekly/monthly/range) 기준으로 혈당 기록 조회")
     @GetMapping("/blood-sugar")
     public ResponseEntity<List<BloodSugarLogResponse>> getBloodSugarRecords(
             @AuthenticationPrincipal UserIdPrincipal principal,
             @ParameterObject RecordQueryRequest query
     ) {
-        Long userId = PrincipalResolver.resolveUserId(principal);
-        var range = query.toRange(kstClock);
-        return ResponseEntity.ok(bloodSugarService.getBloodSugarLogs(userId, range.start(), range.end()));
+        return queryByRange(principal, query, bloodSugarService::getBloodSugarLogs);
     }
 
-    @Operation(
-            summary = "혈압 기록 등록",
-            description = "신규 경로: /api/records/blood-pressure. 기존 /api/measurements/blood-pressure/logs 경로는 삭제 예정입니다."
-    )
+    @Operation(summary = "혈압 기록 등록", description = "혈압 기록 등록")
     @PostMapping("/blood-pressure")
     public ResponseEntity<BloodPressureLogResponse> createBloodPressureRecord(
             @AuthenticationPrincipal UserIdPrincipal principal,
             @Valid @RequestBody BloodPressureLogCreateRequest request
     ) {
-        Long userId = PrincipalResolver.resolveUserId(principal);
-        return ResponseEntity.status(HttpStatus.CREATED).body(bloodPressureService.createBloodPressureLog(userId, request));
+        return created(bloodPressureService.createBloodPressureLog(resolveUserId(principal), request));
     }
 
-    @Operation(
-            summary = "혈압 기록 조회",
-            description = "period(daily/weekly/monthly/range) 기준으로 혈압 기록 조회. 기존 /api/measurements/blood-pressure/logs 조회 경로는 삭제 예정입니다."
-    )
+    @Operation(summary = "혈압 기록 조회", description = "period(daily/weekly/monthly/range) 기준으로 혈압 기록 조회")
     @GetMapping("/blood-pressure")
     public ResponseEntity<List<BloodPressureLogResponse>> getBloodPressureRecords(
             @AuthenticationPrincipal UserIdPrincipal principal,
             @ParameterObject RecordQueryRequest query
     ) {
-        Long userId = PrincipalResolver.resolveUserId(principal);
-        var range = query.toRange(kstClock);
-        return ResponseEntity.ok(bloodPressureService.getBloodPressureLogs(userId, range.start(), range.end()));
+        return queryByRange(principal, query, bloodPressureService::getBloodPressureLogs);
     }
 
     @Operation(summary = "인슐린 기록 등록")
@@ -112,8 +102,7 @@ public class RecordController {
             @AuthenticationPrincipal UserIdPrincipal principal,
             @Valid @RequestBody InsulinLogCreateRequest request
     ) {
-        Long userId = PrincipalResolver.resolveUserId(principal);
-        return ResponseEntity.status(HttpStatus.CREATED).body(insulinLogService.createInsulinLog(userId, request));
+        return created(insulinLogService.createInsulinLog(resolveUserId(principal), request));
     }
 
     @Operation(summary = "인슐린 기록 조회", description = "period(daily/weekly/monthly/range) 기준으로 인슐린 기록 조회")
@@ -122,9 +111,7 @@ public class RecordController {
             @AuthenticationPrincipal UserIdPrincipal principal,
             @ParameterObject RecordQueryRequest query
     ) {
-        Long userId = PrincipalResolver.resolveUserId(principal);
-        var range = query.toRange(kstClock);
-        return ResponseEntity.ok(insulinLogService.getInsulinLogs(userId, range.start(), range.end()));
+        return queryByRange(principal, query, insulinLogService::getInsulinLogs);
     }
 
     @Operation(summary = "식사 기록 등록")
@@ -133,8 +120,7 @@ public class RecordController {
             @AuthenticationPrincipal UserIdPrincipal principal,
             @Valid @RequestBody FoodLogCreateRequest request
     ) {
-        Long userId = PrincipalResolver.resolveUserId(principal);
-        return ResponseEntity.status(HttpStatus.CREATED).body(foodLogService.createFoodLog(userId, request));
+        return created(foodLogService.createFoodLog(resolveUserId(principal), request));
     }
 
     @Operation(summary = "식사 기록 조회", description = "period(daily/weekly/monthly/range) 기준으로 식사 기록 조회")
@@ -143,9 +129,7 @@ public class RecordController {
             @AuthenticationPrincipal UserIdPrincipal principal,
             @ParameterObject RecordQueryRequest query
     ) {
-        Long userId = PrincipalResolver.resolveUserId(principal);
-        var range = query.toRange(kstClock);
-        return ResponseEntity.ok(foodLogService.getFoodLogs(userId, range.start(), range.end()));
+        return queryByRange(principal, query, foodLogService::getFoodLogs);
     }
 
     @Operation(summary = "식사 기록 삭제")
@@ -154,19 +138,17 @@ public class RecordController {
             @AuthenticationPrincipal UserIdPrincipal principal,
             @PathVariable Long foodLogId
     ) {
-        Long userId = PrincipalResolver.resolveUserId(principal);
-        foodLogService.deleteFoodLog(userId, foodLogId);
+        foodLogService.deleteFoodLog(resolveUserId(principal), foodLogId);
         return ResponseEntity.noContent().build();
     }
 
-    @Operation(summary = "운동 기록 등록")
+    @Operation(summary = "운동 기록 등록", description = "운동 기록 등록")
     @PostMapping("/exercise")
     public ResponseEntity<ExerciseLogCreateResponse> createExerciseRecord(
             @AuthenticationPrincipal UserIdPrincipal principal,
             @Valid @RequestBody ExerciseLogRequest request
     ) {
-        Long userId = PrincipalResolver.resolveUserId(principal);
-        return ResponseEntity.status(HttpStatus.CREATED).body(exerciseLogService.createExerciseLog(userId, request));
+        return created(exerciseLogService.createExerciseLog(resolveUserId(principal), request));
     }
 
     @Operation(summary = "운동 기록 조회", description = "period(daily/weekly/monthly/range) 기준으로 운동 기록 조회")
@@ -175,8 +157,59 @@ public class RecordController {
             @AuthenticationPrincipal UserIdPrincipal principal,
             @ParameterObject RecordQueryRequest query
     ) {
-        Long userId = PrincipalResolver.resolveUserId(principal);
-        var range = query.toRange(kstClock);
-        return ResponseEntity.ok(exerciseLogService.getExerciseLogs(userId, range.start(), range.end()));
+        return queryByRange(principal, query, exerciseLogService::getExerciseLogs);
+    }
+
+    @Operation(summary = "걸음수 동기화", description = "소스(APPLE_HEALTH/GOOGLE_FIT/MANUAL)별 일자 걸음수 업서트")
+    @PostMapping("/steps/sync")
+    public ResponseEntity<StepSyncResponse> syncSteps(
+            @AuthenticationPrincipal UserIdPrincipal principal,
+            @Valid @RequestBody StepSyncRequest request
+    ) {
+        return created(stepLogService.syncStepLog(resolveUserId(principal), request));
+    }
+
+    @Operation(summary = "오늘 걸음수 조회", description = "KST 기준 오늘 총 걸음수 조회")
+    @GetMapping("/steps/today")
+    public ResponseEntity<StepTodayResponse> getTodaySteps(
+            @AuthenticationPrincipal UserIdPrincipal principal
+    ) {
+        return ResponseEntity.ok(stepLogService.getTodaySteps(resolveUserId(principal)));
+    }
+
+    @Operation(summary = "걸음수 기록 조회", description = "period(daily/weekly/monthly/range) 기준 일자별 걸음수 합계 조회")
+    @GetMapping("/steps")
+    public ResponseEntity<List<StepDailyResponse>> getStepRecords(
+            @AuthenticationPrincipal UserIdPrincipal principal,
+            @ParameterObject RecordQueryRequest query
+    ) {
+        return queryByRange(principal, query, stepLogService::getStepLogs);
+    }
+
+    private Long resolveUserId(UserIdPrincipal principal) {
+        return PrincipalResolver.resolveUserId(principal);
+    }
+
+    private RecordPeriodSupport.DateTimeRange resolveRange(RecordQueryRequest query) {
+        return query.toRange(kstClock);
+    }
+
+    private <T> ResponseEntity<T> created(T body) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(body);
+    }
+
+    private <T> ResponseEntity<List<T>> queryByRange(
+            UserIdPrincipal principal,
+            RecordQueryRequest query,
+            RangeQueryHandler<T> handler
+    ) {
+        Long userId = resolveUserId(principal);
+        RecordPeriodSupport.DateTimeRange range = resolveRange(query);
+        return ResponseEntity.ok(handler.get(userId, range.start(), range.end()));
+    }
+
+    @FunctionalInterface
+    private interface RangeQueryHandler<T> {
+        List<T> get(Long userId, LocalDateTime start, LocalDateTime end);
     }
 }

@@ -16,6 +16,8 @@ import java.util.UUID;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.TimeUnit;
 
+import static com.kangaroo.sparring.global.support.LogMaskingSupport.maskEmail;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -81,7 +83,7 @@ public class EmailService {
 
         deleteVerification(verificationId, email);
 
-        log.info("email verification success: email={}, verificationId={}", email, verificationId);
+        log.info("email verification success: email={}, verificationId={}", maskEmail(email), verificationId);
         return EmailVerificationResult.forVerify(email, userId);
     }
 
@@ -169,7 +171,7 @@ public class EmailService {
         }
 
         LocalDateTime expiresAt = LocalDateTime.now().plusMinutes(CODE_EXPIRATION_MINUTES);
-        log.info("{}: email={}, verificationId={}", logMessage, email, verificationId);
+        log.info("{}: email={}, verificationId={}", logMessage, maskEmail(email), verificationId);
         return EmailVerificationResult.forSend(verificationId, email, expiresAt);
     }
 

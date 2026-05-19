@@ -9,6 +9,9 @@ import org.springframework.util.StreamUtils;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
 
 @Component
 public class InsightPromptSupport {
@@ -34,7 +37,7 @@ public class InsightPromptSupport {
     }
 
     private String describeSituation(InsightContext context) {
-        return switch (context.getType()) {
+        String base = switch (context.getType()) {
             case BLOOD_SUGAR_STABLE ->
                     String.format("최근 공복 혈당이 3일 이상 안정적으로 유지되고 있습니다. (평균 %.0f mg/dL)",
                             context.getAvgGlucose());
@@ -56,6 +59,7 @@ public class InsightPromptSupport {
             case NO_DATA ->
                     "아직 건강 기록 데이터가 없습니다. 첫 측정을 시작해보세요.";
         };
+        return appendLifestyleSignals(base, context);
     }
 
     private String describeTimeSlot(MealTimeSlot slot) {
@@ -64,5 +68,22 @@ public class InsightPromptSupport {
             case AFTERNOON -> "점심 이후";
             case EVENING -> "저녁";
         };
+    }
+
+    private String appendLifestyleSignals(String base, InsightContext context) {
+        List<String> signals = new ArrayList<>();
+
+        if (context.getMealLogCount() != null && context.getMealLogCount() > 0) {
+            signals.add(String.format("최근 7일 식사 기록 %d회", context.getMealLogCount()));
+        }
+
+        if (context.getTodaySteps() != null && context.getTodaySteps() > 0) {
+            signals.add(String.format(Locale.KOREA, "오늘 걸음수 %,d보", context.getTodaySteps()));
+        }
+
+        if (signals.isEmpty()) {
+            return base;
+        }
+        return base + " " + String.join(", ", signals) + "를 함께 참고했어요.";
     }
 }

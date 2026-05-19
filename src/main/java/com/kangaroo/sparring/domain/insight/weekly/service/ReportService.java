@@ -1,10 +1,10 @@
 package com.kangaroo.sparring.domain.insight.weekly.service;
 
-import com.kangaroo.sparring.domain.record.common.read.ExerciseRecord;
-import com.kangaroo.sparring.domain.record.common.read.FoodRecord;
-import com.kangaroo.sparring.domain.record.common.read.BloodPressureRecord;
-import com.kangaroo.sparring.domain.record.common.read.BloodSugarRecord;
-import com.kangaroo.sparring.domain.record.common.read.RecordReadService;
+import com.kangaroo.sparring.domain.record.common.ExerciseRecord;
+import com.kangaroo.sparring.domain.record.common.FoodRecord;
+import com.kangaroo.sparring.domain.record.common.BloodPressureRecord;
+import com.kangaroo.sparring.domain.record.common.BloodSugarRecord;
+import com.kangaroo.sparring.domain.record.common.RecordReadService;
 import com.kangaroo.sparring.domain.insight.weekly.dto.internal.DailyConditionEvidence;
 import com.kangaroo.sparring.domain.insight.weekly.dto.internal.HighlightEvidence;
 import com.kangaroo.sparring.domain.insight.weekly.dto.internal.ImprovementEvidence;
@@ -19,9 +19,11 @@ import com.kangaroo.sparring.domain.insight.weekly.repository.ReportRepository;
 import com.kangaroo.sparring.domain.insight.weekly.type.ImprovementCategory;
 import com.kangaroo.sparring.domain.user.entity.User;
 import com.kangaroo.sparring.domain.user.repository.UserRepository;
+import com.kangaroo.sparring.domain.user.service.UserLookupService;
 import com.kangaroo.sparring.global.exception.CustomException;
 import com.kangaroo.sparring.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -42,6 +44,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class ReportService {
@@ -49,6 +52,7 @@ public class ReportService {
     private final ReportRepository reportRepository;
     private final ReportPersistenceService reportPersistenceService;
     private final UserRepository userRepository;
+    private final UserLookupService userLookupService;
     private final RecordReadService recordReadService;
     private final ReportGeminiService reportGeminiService;
     private final ReportRuleEngine reportRuleEngine;
@@ -58,39 +62,60 @@ public class ReportService {
     private final Executor reportAiExecutor;
 
     public ReportResponse getReportByDate(Long userId, LocalDate date) {
+        long startedAt = System.currentTimeMillis();
+        log.info("주간 리포트 조회 시작: userId={}, date={}", userId, date);
         LocalDate baseDate = date != null ? date : LocalDate.now(kstClock);
         LocalDate monday = getMonday(baseDate);
         LocalDate sunday = monday.plusDays(6);
 
         Optional<Report> existing = reportRepository.findByUserIdAndStartDate(userId, monday);
         if (existing.isPresent()) {
-            return getOrBuildCachedResponse(userId, monday, sunday, existing.get());
+            ReportResponse response = getOrBuildCachedResponse(userId, monday, sunday, existing.get());
+            log.info("주간 리포트 조회 완료(기존 리포트): userId={}, startDate={}, elapsedMs={}",
+                    userId, monday, System.currentTimeMillis() - startedAt);
+            return response;
         }
 
         if (shouldPersistFinalReport(sunday)) {
-            return generateAndSave(userId, monday, sunday);
+            ReportResponse response = generateAndSave(userId, monday, sunday);
+            log.info("주간 리포트 조회 완료(신규 저장): userId={}, startDate={}, elapsedMs={}",
+                    userId, monday, System.currentTimeMillis() - startedAt);
+            return response;
         }
-        return generatePreview(userId, monday, sunday);
+        ReportResponse response = generatePreview(userId, monday, sunday);
+        log.info("주간 리포트 조회 완료(미리보기): userId={}, startDate={}, elapsedMs={}",
+                userId, monday, System.currentTimeMillis() - startedAt);
+        return response;
     }
 
     public Page<ReportListItemResponse> getReportHistory(Long userId, Integer year, Integer month, int page, int size) {
+        long startedAt = System.currentTimeMillis();
         PageRequest pageable = PageRequest.of(
                 Math.max(page, 0),
                 Math.min(Math.max(size, 1), 100),
                 Sort.by(Sort.Direction.DESC, "startDate")
         );
-        return reportRepository.findPageByUserIdAndYearMonth(userId, year, month, pageable)
+        Page<ReportListItemResponse> result = reportRepository.findPageByUserIdAndYearMonth(userId, year, month, pageable)
                 .map(ReportListItemResponse::from);
+        log.debug("리포트 히스토리 조회 완료: userId={}, year={}, month={}, page={}, size={}, returned={}, elapsedMs={}",
+                userId, year, month, page, size, result.getNumberOfElements(), System.currentTimeMillis() - startedAt);
+        return result;
     }
 
     public ReportResponse getReport(Long userId, Long reportId) {
+        long startedAt = System.currentTimeMillis();
+        log.info("리포트 단건 조회 시작: userId={}, reportId={}", userId, reportId);
         Report report = reportRepository.findByIdAndUserId(reportId, userId)
                 .orElseThrow(() -> new CustomException(ErrorCode.REPORT_NOT_FOUND));
 
-        return getOrBuildCachedResponse(userId, report.getStartDate(), report.getEndDate(), report);
+        ReportResponse response = getOrBuildCachedResponse(userId, report.getStartDate(), report.getEndDate(), report);
+        log.info("리포트 단건 조회 완료: userId={}, reportId={}, elapsedMs={}",
+                userId, reportId, System.currentTimeMillis() - startedAt);
+        return response;
     }
 
     private ReportResponse generateAndSave(Long userId, LocalDate monday, LocalDate sunday) {
+        log.info("주간 리포트 생성+저장 시작: userId={}, startDate={}, endDate={}", userId, monday, sunday);
         GeneratedReport generated = generateReport(userId, monday, sunday);
         Report report = generated.report();
         ReportEvidence evidence = generated.evidence();
@@ -101,6 +126,7 @@ public class ReportService {
             reportCacheService.cache(userId, monday, response);
             return response;
         } catch (DataIntegrityViolationException ex) {
+            log.warn("주간 리포트 저장 충돌 감지, 기존 데이터 재사용: userId={}, startDate={}", userId, monday);
             return reportRepository.findByUserIdAndStartDate(userId, monday)
                     .map(existing -> getOrBuildCachedResponse(userId, monday, sunday, existing))
                     .orElseThrow(() -> ex);
@@ -108,6 +134,7 @@ public class ReportService {
     }
 
     private ReportResponse generatePreview(Long userId, LocalDate monday, LocalDate sunday) {
+        log.info("주간 리포트 미리보기 생성 시작: userId={}, startDate={}, endDate={}", userId, monday, sunday);
         GeneratedReport generated = generateReport(userId, monday, sunday);
         ReportResponse response = toResponse(generated.report(), generated.evidence());
         reportCacheService.cache(userId, monday, response);
@@ -115,8 +142,8 @@ public class ReportService {
     }
 
     private GeneratedReport generateReport(Long userId, LocalDate monday, LocalDate sunday) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+        long startedAt = System.currentTimeMillis();
+        User user = userLookupService.getUserOrThrow(userId);
 
         WeeklyLogs logs = fetchWeeklyLogs(userId, monday, sunday);
         validateWeeklyLogs(logs);
@@ -148,6 +175,8 @@ public class ReportService {
                 improvementFields.detail(),
                 generatedAiContent.tips()
         );
+        log.info("주간 리포트 생성 완료: userId={}, startDate={}, score={}, elapsedMs={}",
+                userId, monday, evidence.score().overallScore(), System.currentTimeMillis() - startedAt);
         return new GeneratedReport(report, evidence);
     }
 
@@ -156,11 +185,13 @@ public class ReportService {
                 && logs.bloodPressureLogs().isEmpty()
                 && logs.foodLogs().isEmpty()
                 && logs.exerciseLogs().isEmpty()) {
+            log.warn("주간 리포트 생성 불가: 기록 데이터 없음");
             throw new CustomException(ErrorCode.REPORT_INSUFFICIENT_DATA);
         }
     }
 
     private GeneratedAiContent generateAiContent(ReportEvidence evidence) {
+        long startedAt = System.currentTimeMillis();
         CompletableFuture<String> commentFuture =
                 CompletableFuture.supplyAsync(
                         () -> reportGeminiService.generateComment(evidence),
@@ -168,7 +199,10 @@ public class ReportService {
                 );
 
         CompletableFuture<List<String>> tipsFuture = generateTipsFuture(evidence.improvement());
-        return new GeneratedAiContent(commentFuture.join(), tipsFuture.join());
+        GeneratedAiContent content = new GeneratedAiContent(commentFuture.join(), tipsFuture.join());
+        log.info("주간 리포트 AI 생성 완료: score={}, tips={}, elapsedMs={}",
+                evidence.score().overallScore(), content.tips().size(), System.currentTimeMillis() - startedAt);
+        return content;
     }
 
     private CompletableFuture<List<String>> generateTipsFuture(ImprovementEvidence improvement) {
@@ -216,6 +250,7 @@ public class ReportService {
     }
 
     private WeeklyLogs fetchWeeklyLogs(Long userId, LocalDate monday, LocalDate sunday) {
+        long startedAt = System.currentTimeMillis();
         LocalDateTime startDt = monday.atStartOfDay();
         LocalDateTime endDt = sunday.atTime(LocalTime.MAX);
 
@@ -224,7 +259,11 @@ public class ReportService {
         List<FoodRecord> foodLogs = recordReadService.getFoodRecords(userId, startDt, endDt);
         List<ExerciseRecord> exerciseLogs = recordReadService.getExerciseRecords(userId, startDt, endDt);
 
-        return new WeeklyLogs(bsLogs, bpLogs, foodLogs, exerciseLogs);
+        WeeklyLogs logs = new WeeklyLogs(bsLogs, bpLogs, foodLogs, exerciseLogs);
+        log.debug("주간 리포트 데이터 조회 완료: userId={}, startDate={}, bs={}, bp={}, food={}, exercise={}, elapsedMs={}",
+                userId, monday, bsLogs.size(), bpLogs.size(), foodLogs.size(), exerciseLogs.size(),
+                System.currentTimeMillis() - startedAt);
+        return logs;
     }
 
     private ReportResponse toResponse(Report report, ReportEvidence evidence) {

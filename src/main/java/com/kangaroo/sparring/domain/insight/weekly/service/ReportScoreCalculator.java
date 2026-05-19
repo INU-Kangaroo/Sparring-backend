@@ -1,9 +1,9 @@
 package com.kangaroo.sparring.domain.insight.weekly.service;
 
-import com.kangaroo.sparring.domain.record.common.read.BloodPressureRecord;
-import com.kangaroo.sparring.domain.record.common.read.BloodSugarRecord;
-import com.kangaroo.sparring.domain.record.common.read.ExerciseRecord;
-import com.kangaroo.sparring.domain.record.common.read.FoodRecord;
+import com.kangaroo.sparring.domain.record.common.BloodPressureRecord;
+import com.kangaroo.sparring.domain.record.common.BloodSugarRecord;
+import com.kangaroo.sparring.domain.record.common.ExerciseRecord;
+import com.kangaroo.sparring.domain.record.common.FoodRecord;
 import com.kangaroo.sparring.domain.insight.weekly.policy.ReportPolicyProperties;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;

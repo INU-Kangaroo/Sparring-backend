@@ -12,9 +12,9 @@ import java.util.List;
 public class SupplementRecommendationResponse {
 
     @Schema(description = "영양제 목록")
-    private List<SupplementDto> supplements;
+    private List<SupplementResponse> supplements;
 
-    public static SupplementRecommendationResponse of(List<SupplementDto> supplements) {
+    public static SupplementRecommendationResponse of(List<SupplementResponse> supplements) {
         return SupplementRecommendationResponse.builder()
                 .supplements(supplements)
                 .build();

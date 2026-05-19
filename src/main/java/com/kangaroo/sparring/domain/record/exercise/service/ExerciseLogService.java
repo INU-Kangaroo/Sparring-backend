@@ -9,6 +9,7 @@ import com.kangaroo.sparring.domain.healthprofile.entity.HealthProfile;
 import com.kangaroo.sparring.domain.healthprofile.repository.HealthProfileRepository;
 import com.kangaroo.sparring.domain.user.entity.User;
 import com.kangaroo.sparring.domain.user.repository.UserRepository;
+import com.kangaroo.sparring.domain.user.service.UserLookupService;
 import com.kangaroo.sparring.global.exception.CustomException;
 import com.kangaroo.sparring.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -30,13 +31,14 @@ public class ExerciseLogService {
 
     private final ExerciseLogRepository exerciseLogRepository;
     private final UserRepository userRepository;
+    private final UserLookupService userLookupService;
     private final HealthProfileRepository healthProfileRepository;
     private final ExerciseMatcher exerciseMatcher;
     private final Clock kstClock;
 
     @Transactional
     public ExerciseLogCreateResponse createExerciseLog(Long userId, ExerciseLogRequest request) {
-        User user = findUser(userId);
+        User user = userLookupService.getUserOrThrow(userId);
         HealthProfile healthProfile = findHealthProfile(userId);
 
         double weightKg = healthProfile.getWeight() != null
@@ -81,11 +83,6 @@ public class ExerciseLogService {
                 .stream()
                 .map(ExerciseLogListItemResponse::from)
                 .toList();
-    }
-
-    private User findUser(Long userId) {
-        return userRepository.findById(userId)
-                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
     }
 
     private HealthProfile findHealthProfile(Long userId) {

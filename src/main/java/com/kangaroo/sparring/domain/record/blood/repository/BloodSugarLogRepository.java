@@ -41,6 +41,8 @@ public interface BloodSugarLogRepository extends JpaRepository<BloodSugarLog, Lo
             LocalDateTime endDate
     );
 
+    boolean existsByUserIdAndUpdatedAtAfter(Long userId, LocalDateTime updatedAt);
+
     @Query("SELECT COUNT(b.id) " +
             "FROM BloodSugarLog b " +
             "WHERE b.user.id = :userId " +

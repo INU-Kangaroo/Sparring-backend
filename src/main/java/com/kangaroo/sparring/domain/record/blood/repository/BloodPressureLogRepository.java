@@ -70,6 +70,8 @@ public interface BloodPressureLogRepository extends JpaRepository<BloodPressureL
             LocalDateTime endDateTime
     );
 
+    boolean existsByUserIdAndUpdatedAtAfter(Long userId, LocalDateTime updatedAt);
+
     interface MonthlyBloodPressureStats {
         Integer getMonth();
         Double getAvgSystolic();

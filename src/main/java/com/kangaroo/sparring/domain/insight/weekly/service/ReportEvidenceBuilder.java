@@ -1,11 +1,11 @@
 package com.kangaroo.sparring.domain.insight.weekly.service;
 
 import com.kangaroo.sparring.domain.common.health.HealthThresholds;
-import com.kangaroo.sparring.domain.record.common.read.BloodPressureRecord;
-import com.kangaroo.sparring.domain.record.common.read.BloodSugarRecord;
-import com.kangaroo.sparring.domain.record.common.read.ExerciseRecord;
-import com.kangaroo.sparring.domain.record.common.read.FoodRecord;
-import com.kangaroo.sparring.domain.record.common.read.TemporalRecord;
+import com.kangaroo.sparring.domain.record.common.BloodPressureRecord;
+import com.kangaroo.sparring.domain.record.common.BloodSugarRecord;
+import com.kangaroo.sparring.domain.record.common.ExerciseRecord;
+import com.kangaroo.sparring.domain.record.common.FoodRecord;
+import com.kangaroo.sparring.domain.record.common.TemporalRecord;
 import com.kangaroo.sparring.domain.insight.weekly.dto.internal.DailyConditionEvidence;
 import com.kangaroo.sparring.domain.insight.weekly.dto.internal.HighlightEvidence;
 import com.kangaroo.sparring.domain.insight.weekly.dto.internal.ImprovementEvidence;

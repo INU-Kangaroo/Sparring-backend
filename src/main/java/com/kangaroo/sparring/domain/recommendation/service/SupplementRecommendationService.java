@@ -1,11 +1,11 @@
 package com.kangaroo.sparring.domain.recommendation.service;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kangaroo.sparring.domain.healthprofile.entity.HealthProfile;
-import com.kangaroo.sparring.domain.record.common.read.BloodPressureRecord;
-import com.kangaroo.sparring.domain.record.common.read.BloodSugarRecord;
-import com.kangaroo.sparring.domain.recommendation.dto.res.SupplementDto;
+import com.kangaroo.sparring.domain.healthprofile.service.HealthProfileService;
+import com.kangaroo.sparring.domain.record.common.BloodPressureRecord;
+import com.kangaroo.sparring.domain.record.common.BloodSugarRecord;
+import com.kangaroo.sparring.domain.record.common.RecordReadService;
+import com.kangaroo.sparring.domain.recommendation.dto.res.SupplementResponse;
 import com.kangaroo.sparring.domain.recommendation.dto.res.SupplementRecommendationResponse;
 import com.kangaroo.sparring.domain.recommendation.entity.SupplementRecommendation;
 import com.kangaroo.sparring.domain.recommendation.entity.Recommendation;
@@ -13,12 +13,15 @@ import com.kangaroo.sparring.domain.recommendation.repository.SupplementRecommen
 import com.kangaroo.sparring.domain.recommendation.repository.RecommendationRepository;
 import com.kangaroo.sparring.domain.recommendation.type.RecommendationType;
 import com.kangaroo.sparring.domain.user.entity.User;
+import com.kangaroo.sparring.domain.user.repository.UserRepository;
+import com.kangaroo.sparring.domain.user.service.UserLookupService;
 import com.kangaroo.sparring.global.exception.CustomException;
 import com.kangaroo.sparring.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -34,48 +37,56 @@ public class SupplementRecommendationService {
 
     private final RecommendationRepository recommendationRepository;
     private final SupplementRecommendationRepository supplementRecommendationRepository;
-    private final GeminiApiClient geminiApiClient;
-    private final ObjectMapper objectMapper;
-    private final RecommendationPersistenceService recommendationPersistenceService;
+    private final SupplementRecommendationAiClient supplementRecommendationAiClient;
     private final RecommendationPromptTemplateService promptTemplateService;
-    private final RecommendationContextService recommendationContextService;
     private final RecommendationJsonMappingSupport jsonMappingSupport;
+    private final UserRepository userRepository;
+    private final UserLookupService userLookupService;
+    private final HealthProfileService healthProfileService;
+    private final RecordReadService recordReadService;
+    private final Clock kstClock;
 
     public SupplementRecommendationResponse getSupplementRecommendations(Long userId) {
-        User user = recommendationContextService.getUser(userId);
-        LocalDateTime cacheThreshold = LocalDateTime.now().minusHours(CACHE_HOURS);
-
+        User user = userLookupService.getUserOrThrow(userId);
+        LocalDateTime cacheThreshold = LocalDateTime.now(kstClock).minusHours(CACHE_HOURS);
         return recommendationRepository
                 .findCachedRecommendation(
                         user.getId(),
                         RecommendationType.SUPPLEMENT,
                         cacheThreshold
                 )
-                .map(this::buildSupplementRecommendationResponse)
-                .orElseGet(() -> generateNewSupplementRecommendations(user));
+                .map(cached -> {
+                    log.info("영양제 추천 캐시 반환: userId={}", user.getId());
+                    return buildSupplementRecommendationResponse(cached);
+                })
+                .orElseGet(() -> {
+                    log.info("영양제 추천 캐시 미스, 신규 생성: userId={}", user.getId());
+                    return generateNewSupplementRecommendations(user);
+                });
     }
 
     public SupplementRecommendationResponse refreshSupplementRecommendations(Long userId) {
-        User user = recommendationContextService.getUser(userId);
+        User user = userLookupService.getUserOrThrow(userId);
+        log.info("영양제 추천 강제 새로고침 요청: userId={}", user.getId());
         return generateNewSupplementRecommendations(user);
     }
 
     private SupplementRecommendationResponse generateNewSupplementRecommendations(User user) {
-        HealthProfile healthProfile = recommendationContextService.getOrCreateHealthProfile(user.getId());
+        HealthProfile healthProfile = healthProfileService.getOrCreateHealthProfile(user.getId());
         List<BloodSugarRecord> recentBloodSugars =
-                recommendationContextService.getRecentBloodSugars(user.getId(), RECENT_MEASUREMENT_COUNT);
+                recordReadService.getRecentBloodSugarRecords(user.getId(), RECENT_MEASUREMENT_COUNT);
         List<BloodPressureRecord> recentBloodPressures =
-                recommendationContextService.getRecentBloodPressures(user.getId(), RECENT_MEASUREMENT_COUNT);
+                recordReadService.getRecentBloodPressureRecords(user.getId(), RECENT_MEASUREMENT_COUNT);
 
         String prompt = buildSupplementPrompt(healthProfile, recentBloodSugars, recentBloodPressures);
-        String geminiResponse = geminiApiClient.generateContent(prompt);
-        SupplementRecommendationResponse response = parseSupplementResponse(geminiResponse);
+        SupplementRecommendationResponse response = supplementRecommendationAiClient.recommend(prompt);
 
         Recommendation recommendation = Recommendation.createSupplementRecommendation(user);
-        recommendationPersistenceService.persistSupplementRecommendation(
-                recommendation,
-                buildSupplementEntities(recommendation, response)
-        );
+        recommendationRepository.save(recommendation);
+        List<SupplementRecommendation> supplements = buildSupplementEntities(recommendation, response);
+        if (!supplements.isEmpty()) {
+            supplementRecommendationRepository.saveAll(supplements);
+        }
 
         log.info("새로운 영양제 추천 생성 완료: userId={}", user.getId());
         return response;
@@ -84,47 +95,16 @@ public class SupplementRecommendationService {
     private String buildSupplementPrompt(HealthProfile healthProfile,
                                          List<BloodSugarRecord> bloodSugars,
                                          List<BloodPressureRecord> bloodPressures) {
-        String userHealthInfo = RecommendationPromptSupport.buildUserHealthInfo(healthProfile, bloodSugars, bloodPressures);
+        String userHealthInfo = promptTemplateService.buildUserHealthInfo(healthProfile, bloodSugars, bloodPressures);
         return promptTemplateService.renderSupplementPrompt(Map.of(
                 "USER_HEALTH_INFO", userHealthInfo
         ));
     }
 
-    private SupplementRecommendationResponse parseSupplementResponse(String geminiResponse) {
-        try {
-            JsonNode root = jsonMappingSupport.readTreeOrThrow(
-                    RecommendationJsonSupport.extractJsonObject(geminiResponse),
-                    geminiResponse,
-                    "Gemini 영양제 추천 응답"
-            );
-            List<SupplementDto> supplements = new ArrayList<>();
-            JsonNode supplementsNode = resolveSupplementsNode(root);
-
-            if (supplementsNode.isArray()) {
-                for (JsonNode node : supplementsNode) {
-                    supplements.add(SupplementDto.of(
-                            node.path("name").asText(),
-                            node.path("dosage").asText(),
-                            node.path("frequency").asText(),
-                            readBenefits(node),
-                            jsonMappingSupport.readPrecautions(node)
-                    ));
-                }
-            }
-
-            return SupplementRecommendationResponse.of(supplements);
-        } catch (CustomException e) {
-            throw e;
-        } catch (Exception e) {
-            log.error("영양제 추천 처리 실패: body={}", RecommendationJsonSupport.abbreviate(geminiResponse), e);
-            throw new CustomException(ErrorCode.INTERNAL_SERVER_ERROR);
-        }
-    }
-
     private List<SupplementRecommendation> buildSupplementEntities(Recommendation recommendation, SupplementRecommendationResponse response) {
         List<SupplementRecommendation> supplements = new ArrayList<>();
 
-        for (SupplementDto dto : response.getSupplements()) {
+        for (SupplementResponse dto : response.getSupplements()) {
             supplements.add(SupplementRecommendation.of(
                     recommendation,
                     dto.getName(),
@@ -141,87 +121,16 @@ public class SupplementRecommendationService {
     private SupplementRecommendationResponse buildSupplementRecommendationResponse(Recommendation recommendation) {
         List<SupplementRecommendation> supplements = supplementRecommendationRepository.findByRecommendationOrderByIdAsc(recommendation);
 
-        List<SupplementDto> supplementDtos = supplements.stream()
-                .map(n -> SupplementDto.of(
+        List<SupplementResponse> supplementDtos = supplements.stream()
+                .map(n -> SupplementResponse.of(
                         n.getName(),
                         n.getDosage(),
                         n.getFrequency(),
-                        readBenefitsText(n.getBenefits()),
+                        jsonMappingSupport.readJsonArray(n.getBenefits()),
                         jsonMappingSupport.readJsonArray(n.getPrecautions())
                 ))
                 .toList();
 
         return SupplementRecommendationResponse.of(supplementDtos);
     }
-
-    private JsonNode resolveSupplementsNode(JsonNode root) {
-        if (root == null || root.isMissingNode() || root.isNull()) {
-            return objectMapper.createArrayNode();
-        }
-        if (root.isArray()) {
-            return root;
-        }
-        JsonNode supplementsNode = root.path("supplements");
-        if (supplementsNode.isArray()) {
-            return supplementsNode;
-        }
-        JsonNode nutrientsNode = root.path("nutrients");
-        if (nutrientsNode.isArray()) {
-            return nutrientsNode;
-        }
-        return objectMapper.createArrayNode();
-    }
-
-    private List<String> readBenefits(JsonNode node) {
-        List<String> benefits = readStringListFlexible(node.path("benefits"));
-        if (!benefits.isEmpty()) {
-            return benefits;
-        }
-        benefits = readStringListFlexible(node.path("benefit"));
-        if (!benefits.isEmpty()) {
-            return benefits;
-        }
-        return List.of();
-    }
-
-    private List<String> readBenefitsText(String raw) {
-        if (raw == null || raw.isBlank()) {
-            return List.of();
-        }
-        String trimmed = raw.trim();
-        if (!trimmed.startsWith("[")) {
-            return List.of(trimmed);
-        }
-        try {
-            JsonNode node = objectMapper.readTree(trimmed);
-            return RecommendationJsonSupport.readStringArray(node);
-        } catch (Exception e) {
-            log.warn("효능 문자열 역직렬화 실패: value={}", raw);
-            return List.of(trimmed);
-        }
-    }
-
-    private List<String> readStringListFlexible(JsonNode node) {
-        List<String> values = RecommendationJsonSupport.readStringArray(node);
-        if (!values.isEmpty()) {
-            return values;
-        }
-        if (node != null && node.isTextual()) {
-            String text = node.asText("").trim();
-            if (text.isEmpty()) {
-                return List.of();
-            }
-            String[] lines = text.split("\\R");
-            List<String> lineValues = new ArrayList<>();
-            for (String line : lines) {
-                String trimmed = line.trim().replaceFirst("^[\\-•\\d.\\)\\s]+", "");
-                if (!trimmed.isBlank()) {
-                    lineValues.add(trimmed);
-                }
-            }
-            return lineValues.isEmpty() ? List.of(text) : lineValues;
-        }
-        return List.of();
-    }
-
 }

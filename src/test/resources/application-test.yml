@@ -86,13 +86,19 @@ cors:
 
 gemini:
   api:
-    key: test-gemini-key
+    keys:
+      - test-gemini-key-1
+      - test-gemini-key-2
+      - test-gemini-key-3
     url: https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent
 
 ml:
-  server:
+  recommendation:
     url: http://localhost:8000
-    recommend-path: /recommend
+    path: /recommend
+  prediction:
+    url: http://localhost:8001
+    path: /predict-glucose
 
 report:
   policy:

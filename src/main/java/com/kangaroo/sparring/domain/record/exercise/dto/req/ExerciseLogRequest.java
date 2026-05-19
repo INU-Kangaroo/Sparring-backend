@@ -23,7 +23,7 @@ public class ExerciseLogRequest {
     private Integer durationMinutes;
 
     @NotNull
-    @Schema(description = "운동 강도 (LOW/MEDIUM/HIGH)")
+    @Schema(description = "운동 강도 (LOW/MODERATE/HIGH)")
     private ExerciseIntensity intensity;
 
     @NotNull
